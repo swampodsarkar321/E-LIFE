@@ -35,7 +35,13 @@
   #mic svg{width:28px;height:28px;fill:#fff;display:block;margin:auto}
   #emotes{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);display:none;gap:8px;flex-wrap:wrap;justify-content:center;max-width:90vw;z-index:5}
   #emotes button{padding:10px 14px;font-size:15px}
-  #load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#123;font-size:22px;z-index:9}
+  #load{position:fixed;inset:0;display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 35%,#1c2f55 0%,#0a1122 70%);font-size:18px;z-index:60;text-align:center;padding:20px}
+  #load .logo{margin:0;font-size:clamp(40px,9vw,84px);font-weight:900;letter-spacing:4px;background:linear-gradient(180deg,#ffe27a,#ff9d2e);-webkit-background-clip:text;background-clip:text;color:transparent}
+  #load .tag{margin:0;font-size:13px;color:#9fb3d8;letter-spacing:4px;text-transform:uppercase}
+  #lbar{width:min(380px,80vw);height:14px;background:#ffffff18;border-radius:8px;overflow:hidden;border:1px solid #ffffff2a}
+  #lfill{height:100%;width:0%;background:linear-gradient(90deg,#57e389,#ffd21f);border-radius:8px;transition:width .2s}
+  #lstatus{margin:0;font-size:15px;color:#cfe0ff}
+  #ltip{margin:0;font-size:13px;color:#9fb3d8;max-width:420px}
   #pname{font:inherit;font-weight:700;border:0;border-radius:12px;padding:12px 16px;font-size:18px;color:#123;width:min(240px,60vw);text-align:center}
   #rotate{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#123;font-size:24px;z-index:50;text-align:center;padding:20px}
   @media (orientation:portrait){ #rotate{display:flex} }
@@ -50,7 +56,13 @@
 </style>
 </head>
 <body>
-<div id="load">Loading v30...</div>
+<div id="load">
+  <p class="logo">E-LIFE</p>
+  <p class="tag">Open-world city roleplay</p>
+  <div id="lbar"><div id="lfill"></div></div>
+  <p id="lstatus">Loading...</p>
+  <p id="ltip">Tip: walk close to other players to voice-chat. Press E for emotes.</p>
+</div>
 <div id="rotate">📱 Rotate your phone to landscape<br><span style="font-size:16px">(this game is landscape only)</span></div>
 <div id="joyBase"></div><div id="joyKnob"></div>
 <button class="tbtn" id="btnJump">JUMP</button>
@@ -75,7 +87,7 @@
       <button id="start"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span>PLAY</span></button>
       <button class="chev" id="next" aria-label="Next"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
     </div>
-    <p id="ver">v30 · multiplayer + voice chat</p>
+    <p id="ver">v31 · multiplayer + voice chat</p>
   </div>
 </div>
 
@@ -155,41 +167,6 @@ const free = (x,z,r) => Math.hypot(x,z) > 8 && colliders.every(c => Math.hypot(c
 
 // city streets (roads cross every chunk center)
 const inRoad = (x, z, x0, z0) => Math.abs(x - x0) < 5.5 || Math.abs(z - z0) < 5.5;
-
-const CITY_BLDG = [
-  {files:['Big Building.glb'], h:22, n:1, c:6, shadow:true},
-  {files:['Brown Building.glb'], h:14, n:2, c:5, shadow:true},
-  {files:['Building Green.glb'], h:12, n:2, c:5, shadow:true},
-  {files:['Building Red.glb','Building Red Corner.glb'], h:12, n:2, c:5, shadow:true},
-];
-const CITY_PROPS = [
-  {files:['Bus Stop.glb'], h:2.6, n:1, c:1.2},
-  {files:['Traffic Light.glb'], h:4.5, n:2},
-  {files:['Bench.glb'], h:1, n:3},
-  {files:['Billboard.glb'], h:6, n:1, c:1},
-  {files:['ATM.glb'], h:1.8, n:1},
-  {files:['Fire hydrant.glb'], h:0.8, n:2},
-  {files:['Trash Can.glb'], h:1, n:3},
-  {files:['Mailbox.glb'], h:1.2, n:1},
-  {files:['Bus stop sign.glb'], h:2.5, n:1},
-  {files:['Stop sign.glb'], h:2.2, n:1},
-  {files:['Fence Piece.glb','Fence.glb','Fence End.glb'], h:1.2, n:5},
-  {files:['Planter & Bushes.glb','Flower Pot.glb','Flower Pot-Kgt363WkKd.glb'], h:1, n:4},
-  {files:['Tree.glb'], h:3.5, n:6, c:0.4},
-  {files:['Cone.glb'], h:0.8, n:4},
-  {files:['Box.glb'], h:0.8, n:3},
-  {files:['Dumpster.glb'], h:1.5, n:1, c:1},
-  {files:['Power Box.glb'], h:1.2, n:1},
-  {files:['Washing Line.glb'], h:2.5, n:1},
-];
-const CITY_CARS = [
-  {files:['Car.glb','Car-unqqkULtRU.glb','SUV.glb','Van.glb'], h:1.6, n:3, c:2.2},
-  {files:['Sports Car.glb','Sports Car-Gzj704DXdr.glb'], h:1.4, n:1, c:2.2},
-  {files:['Bus.glb'], h:3, n:1, c:4},
-  {files:['Pickup Truck.glb'], h:2, n:1, c:2.4},
-  {files:['Police Car.glb'], h:1.6, n:1, c:2.2},
-  {files:['Motorcycle.glb','Bicycle.glb'], h:1.2, n:2},
-];
 
 const CITY_BLDG = [
   {files:['Big Building.glb'], h:22, n:1, c:6, shadow:true},
@@ -840,17 +817,21 @@ function tick(){
 }
 camera.position.set(0,1.4,4.2);
 tick();
-// third-person follow (camera pechon theke): select = one-by-one, play = follow
+function setProg(pct, msg){
+  document.getElementById('lfill').style.width = Math.min(100, pct) + '%';
+  if (msg) document.getElementById('lstatus').textContent = msg;
+}
+// splash: full game loads first, then menu
 Promise.all([
   show(0),
-  loadTemplates((d,n) => { load.textContent = 'Building city... ' + d + '/' + n; }),
+  loadTemplates((d,n) => setProg(5 + 60*d/n, 'Building city... ' + d + '/' + n)),
   (async () => {
     for (let i = 0; i < CHARS.length; i++){
       try { await loadChar(CHARS[i]); } catch(e){}
-      load.textContent = 'Loading characters... ' + (i+1) + '/' + CHARS.length;
+      setProg(65 + 35*(i+1)/CHARS.length, 'Loading characters... ' + (i+1) + '/' + CHARS.length);
     }
   })()
-]).then(() => { ensureGrid(0,0); load.remove(); }).catch(e => {
+]).then(() => { ensureGrid(0,0); setProg(100, 'Ready!'); setTimeout(() => load.remove(), 300); }).catch(e => {
   console.error(e);
   document.getElementById('load').textContent = 'Models failed to load! Open via http://localhost:8000 (' + e.message + ')';
 });
