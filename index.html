@@ -148,16 +148,6 @@ for (let i=0;i<2500;i++){ cx.fillStyle = `hsl(220,4%,${38+Math.random()*14}%)`; 
 const gt = new THREE.CanvasTexture(cv); gt.wrapS = gt.wrapT = THREE.RepeatWrapping; gt.repeat.set(CHUNK/4, CHUNK/4); gt.colorSpace = THREE.SRGBColorSpace;
 const groundGeo = new THREE.PlaneGeometry(CHUNK, CHUNK);
 const groundMat = new THREE.MeshLambertMaterial({map:gt});
-// road texture (asphalt + dashes)
-const rcv = document.createElement('canvas'); rcv.width = 64; rcv.height = 256;
-const rcx = rcv.getContext('2d');
-rcx.fillStyle = '#33373d'; rcx.fillRect(0,0,64,256);
-rcx.fillStyle = '#e8e8e8';
-for (let y = 8; y < 256; y += 42) rcx.fillRect(30, y, 4, 22);
-const roadTx = new THREE.CanvasTexture(rcv); roadTx.wrapS = roadTx.wrapT = THREE.RepeatWrapping; roadTx.repeat.set(1, 6); roadTx.colorSpace = THREE.SRGBColorSpace;
-const roadMat = new THREE.MeshLambertMaterial({map:roadTx});
-const roadGeoX = new THREE.PlaneGeometry(CHUNK, 8);
-const roadGeoZ = new THREE.PlaneGeometry(8, CHUNK);
 
 let seed = 7; const rnd = () => (seed = (seed*16807) % 2147483647) / 2147483647;
 function hashSeed(x,z){ let h = (x*374761393 + z*668265263) | 0; h = Math.imul(h ^ (h>>>13), 1274126177); return h>>>0; }
@@ -173,6 +163,8 @@ const CITY_BLDG = [
   {files:['Brown Building.glb'], h:14, n:2, c:5, shadow:true},
   {files:['Building Green.glb'], h:12, n:2, c:5, shadow:true},
   {files:['Building Red.glb','Building Red Corner.glb'], h:12, n:2, c:5, shadow:true},
+  {files:['Gb Blank.glb'], h:12, n:1, c:5, shadow:true},
+  {files:['RB Blank.glb'], h:12, n:1, c:5, shadow:true},
 ];
 const CITY_PROPS = [
   {files:['Bus Stop.glb'], h:2.6, n:1, c:1.2},
@@ -214,17 +206,27 @@ function prepTreeModel(g, targetH, byWidth){
   return {o, minY:new THREE.Box3().setFromObject(o).min.y};
 }
 const tplCity = [];
-let tplReady = false;
+let tplReady = false, tplJunction = null, tplStraight = null;
 async function loadTemplates(onStep){
   const jobs = [];
   const all = [...CITY_BLDG, ...CITY_PROPS, ...CITY_CARS];
   for (const t of all) for (const f of t.files) jobs.push({t, f:'CITY/' + encodeURIComponent(f)});
+  jobs.push({f:'CITY/' + encodeURIComponent('Road Bits.glb'), roadbits:true});
   const byEntry = new Map();
   let done = 0;
   for (const j of jobs){
     try {
       const g = await loadTreeFile(j.f);
-      {
+      if (j.roadbits){
+        const grab = nm => {
+          const nd = g.scene.children.find(c => c.name === nm);
+          if (nd) nd.traverse(m => { if (m.isMesh){ m.castShadow = false; m.receiveShadow = true; } });
+          return nd;
+        };
+        tplJunction = grab('road_junction');
+        tplStraight = grab('road_straight');
+      }
+      else {
         const p = prepTreeModel(g, j.t.h, false);
         p.o.traverse(m => { if (m.isMesh) m.castShadow = !!j.t.shadow; });
         if (!byEntry.has(j.t)) byEntry.set(j.t, []);
@@ -248,11 +250,22 @@ function makeChunk(ccx, ccz){
   ground.position.set(x0, 0, z0);
   ground.receiveShadow = true;
   g.add(ground);
-  // roads: cross through chunk center
-  const rx = new THREE.Mesh(roadGeoX, roadMat);
-  rx.rotation.x = -Math.PI/2; rx.position.set(x0, 0.02, z0); rx.receiveShadow = true; g.add(rx);
-  const rz = new THREE.Mesh(roadGeoZ, roadMat);
-  rz.rotation.x = -Math.PI/2; rz.position.set(x0, 0.02, z0); rz.receiveShadow = true; g.add(rz);
+  // roads: junction + straight tiles (2m pieces from pack)
+  if (tplJunction && tplStraight){
+    const jn = tplJunction.clone();
+    jn.position.set(x0, 0.02, z0);
+    g.add(jn);
+    for (let k = -22; k <= 22; k++){
+      if (Math.abs(k*2) < 2) continue;
+      const sx = tplStraight.clone();
+      sx.position.set(x0 + k*2, 0.02, z0);
+      g.add(sx);
+      const sz = tplStraight.clone();
+      sz.position.set(x0, 0.02, z0 + k*2);
+      sz.rotation.y = Math.PI/2;
+      g.add(sz);
+    }
+  }
   const onRoad = (x, z) => Math.abs(x - x0) < 5.5 || Math.abs(z - z0) < 5.5;
   const put = (tp, x, z, v, ry, cr) => {
     const c = tp.o.clone();
@@ -303,7 +316,7 @@ function makeChunk(ccx, ccz){
     for (let i = 0, tries = 0; i < t.n && tries < t.n*10; tries++){
       const alongX = R() < 0.5;
       const a = (R()-0.5)*CHUNK*0.85;
-      const lane = R() < 0.5 ? -6.2 : 6.2;
+      const lane = R() < 0.5 ? -2.4 : 2.4;
       const x = alongX ? x0 + a : x0 + lane;
       const z = alongX ? z0 + lane : z0 + a;
       if (Math.hypot(x,z) < 9) continue;
