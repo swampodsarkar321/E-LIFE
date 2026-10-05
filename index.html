@@ -887,21 +887,6 @@ function toggleCar(){
     for (let i = driveables.length-1; i >= 0; i--) if (driveables[i] === d) driveables.splice(i,1);
     scene.attach(d.g);
     d.cr = oc ? oc.r : 2;
-    d.wheels = {spin:[], steer:[]};
-    d.g.traverse(n => {
-      if (n.isMesh && /wheel/i.test(n.name)){
-        // recenter pivot so spin/steer rotates in place
-        if (!n.userData.pivoted && n.geometry){
-          n.geometry.computeBoundingBox();
-          const c0 = n.geometry.boundingBox.getCenter(new THREE.Vector3());
-          n.geometry.translate(-c0.x, -c0.y, -c0.z);
-          n.position.add(c0);
-          n.userData.pivoted = true;
-        }
-        d.wheels.spin.push(n);
-        if (/front/i.test(n.name)) d.wheels.steer.push(n);
-      }
-    });
     driving = true; driveCar = d; driveSpeed = 0;
     cur.visible = false;
     dist = 9;
@@ -933,13 +918,6 @@ function driveTick(dt, f, r){
   if (myColl){ myColl.x = cp.x; myColl.z = cp.z; }
   cur.position.set(cp.x, 0, cp.z); // player rides along (hidden)
   cur.rotation.y = driveCar.g.rotation.y;
-  // wheels: spin + front steer
-  if (driveCar.wheels){
-    const spin = driveSpeed / 0.35 * dt;
-    for (const w of driveCar.wheels.spin) w.rotation.x += spin;
-    const sa = (steer || 0) * 0.45;
-    for (const w of driveCar.wheels.steer) w.rotation.y = sa;
-  }
   yaw = -driveCar.g.rotation.y + Math.PI;
   carPrompt.textContent = 'F — get out (' + Math.abs(Math.round(driveSpeed*3.6)) + ' km/h)';
   carPrompt.style.display = 'block';
