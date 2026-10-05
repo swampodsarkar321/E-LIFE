@@ -226,7 +226,6 @@ async function loadTemplates(onStep){
       const g = await loadTreeFile(j.f);
       {
         const p = prepTreeModel(g, j.t.h, false);
-        const p = prepTreeModel(g, j.t.h, false);
         p.o.traverse(m => { if (m.isMesh) m.castShadow = !!j.t.shadow; });
         if (!byEntry.has(j.t)) byEntry.set(j.t, []);
         byEntry.get(j.t).push(p);
