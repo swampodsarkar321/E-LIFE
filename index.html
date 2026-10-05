@@ -8,6 +8,10 @@
   html,body{margin:0;height:100%;overflow:hidden;background:#9fd3f0;font-family:system-ui,sans-serif;color:#fff;touch-action:none;-webkit-user-select:none;user-select:none}
   canvas{display:block;touch-action:none}
   #select{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;background:linear-gradient(transparent 40%,rgba(0,0,0,.6));z-index:10}
+  @media (min-aspect-ratio: 1/1){
+    #select{flex-direction:row;justify-content:flex-end;align-items:stretch}
+    #menuCard{width:min(430px,38vw);border-radius:24px 0 0 24px;align-self:stretch;display:flex;flex-direction:column;justify-content:center;border-right:0}
+  }
   #menuCard{width:min(480px,94vw);background:rgba(10,16,32,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid #ffffff22;border-bottom:0;border-radius:24px 24px 0 0;padding:20px 22px calc(20px + env(safe-area-inset-bottom));text-align:center;box-shadow:0 -8px 40px #000a}
   #gameLogo{margin:0;font-size:clamp(28px,6vw,44px);font-weight:900;letter-spacing:2px;background:linear-gradient(180deg,#ffe27a,#ff9d2e);-webkit-background-clip:text;background-clip:text;color:transparent}
   #gameSub{margin:2px 0 12px;font-size:13px;color:#9fb3d8;letter-spacing:3px;text-transform:uppercase}
@@ -46,7 +50,7 @@
 </style>
 </head>
 <body>
-<div id="load">Loading v29...</div>
+<div id="load">Loading v30...</div>
 <div id="rotate">📱 Rotate your phone to landscape<br><span style="font-size:16px">(this game is landscape only)</span></div>
 <div id="joyBase"></div><div id="joyKnob"></div>
 <button class="tbtn" id="btnJump">JUMP</button>
@@ -71,7 +75,7 @@
       <button id="start"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span>PLAY</span></button>
       <button class="chev" id="next" aria-label="Next"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
     </div>
-    <p id="ver">v29 · multiplayer + voice chat</p>
+    <p id="ver">v30 · multiplayer + voice chat</p>
   </div>
 </div>
 
@@ -796,8 +800,9 @@ function tick(){
       ensureGrid(cur.position.x, cur.position.z);
     } else {
       yaw = 0;
-      look.set(cur.position.x, 1.1, cur.position.z);
-      camera.position.set(look.x, 1.4, look.z + 4.2);
+      const side = innerWidth > innerHeight ? 1.4 : 0; // landscape: character left
+      look.set(cur.position.x + side, 1.1, cur.position.z);
+      camera.position.set(cur.position.x, 1.4, cur.position.z + 4.2);
     }
     camera.lookAt(look);
     // day-night cycle (240s)
@@ -838,8 +843,14 @@ tick();
 // third-person follow (camera pechon theke): select = one-by-one, play = follow
 Promise.all([
   show(0),
-  loadTemplates((d,n) => { load.textContent = 'Building world... ' + d + '/' + n; })
-]).then(() => { ensureGrid(0,0); load.remove(); CHARS.forEach(n => loadChar(n).catch(()=>{})); }).catch(e => {
+  loadTemplates((d,n) => { load.textContent = 'Building city... ' + d + '/' + n; }),
+  (async () => {
+    for (let i = 0; i < CHARS.length; i++){
+      try { await loadChar(CHARS[i]); } catch(e){}
+      load.textContent = 'Loading characters... ' + (i+1) + '/' + CHARS.length;
+    }
+  })()
+]).then(() => { ensureGrid(0,0); load.remove(); }).catch(e => {
   console.error(e);
   document.getElementById('load').textContent = 'Models failed to load! Open via http://localhost:8000 (' + e.message + ')';
 });
