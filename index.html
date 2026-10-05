@@ -7,9 +7,10 @@
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#9fd3f0;font-family:system-ui,sans-serif;color:#fff;touch-action:none;-webkit-user-select:none;user-select:none}
   canvas{display:block;touch-action:none}
-  #select{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;background:linear-gradient(transparent 40%,rgba(0,0,0,.6));z-index:10}
+  #select, #select2{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;background:linear-gradient(transparent 40%,rgba(0,0,0,.6));z-index:10}
+  #select2{display:none}
   @media (min-aspect-ratio: 1/1){
-    #select{flex-direction:row;justify-content:flex-end;align-items:stretch}
+    #select, #select2{flex-direction:row;justify-content:flex-end;align-items:stretch}
     #menuCard{width:min(430px,38vw);border-radius:24px 0 0 24px;align-self:stretch;display:flex;flex-direction:column;justify-content:center;border-right:0}
   }
   #menuCard{width:min(480px,94vw);background:rgba(10,16,32,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid #ffffff22;border-bottom:0;border-radius:24px 24px 0 0;padding:20px 22px calc(20px + env(safe-area-inset-bottom));text-align:center;box-shadow:0 -8px 40px #000a}
@@ -27,6 +28,23 @@
   .chev{background:#ffffff1a;color:#fff;box-shadow:none;border:1px solid #ffffff2a}
   #start{background:linear-gradient(180deg,#57e389,#28a745);color:#fff;font-size:20px;padding:14px 20px;flex:1}
   #ver{margin:10px 0 0;font-size:12px;color:#9fb3d855}
+  .menubtn{width:100%;margin-top:10px;font-size:19px;padding:15px}
+  #lobbyList{margin:10px 0;max-height:30vh;overflow:auto;text-align:left;font-size:15px}
+  #lobbyList div{padding:6px 10px;background:#ffffff10;border-radius:8px;margin-top:6px}
+  #countBig{font-size:64px;font-weight:900;color:#ffd21f;margin:6px 0}
+  .setrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;font-size:16px}
+  .setrow input[type=range]{flex:1}
+  .seg{display:flex;gap:8px}
+  .seg button.on{background:#ffd21f}
+  #name2{font-size:clamp(16px,3vw,22px);margin:4px 0 8px;color:#9fb3d8}
+  #hiName{margin:0 0 2px;font-size:clamp(20px,4vw,28px)}
+  #carUI{position:fixed;inset:auto 0 0 0;display:none;z-index:6;pointer-events:none}
+  .cbtn{position:fixed;border-radius:50%;width:78px;height:78px;font-size:16px;font-weight:800;border:0;background:#0009;color:#fff;display:flex;align-items:center;justify-content:center;pointer-events:auto}
+  #btnSteerL{left:18px;bottom:100px}
+  #btnSteerR{left:112px;bottom:100px}
+  #btnGas{right:18px;bottom:190px}
+  #btnBrake{right:18px;bottom:100px}
+  #btnGear{right:112px;bottom:100px}
   #hud{position:fixed;left:12px;top:12px;font-size:14px;line-height:1.6;background:#0006;padding:8px 12px;border-radius:10px;display:none}
   #score{position:fixed;right:12px;top:12px;font-size:18px;font-weight:700;background:#0008;padding:10px 16px;border-radius:12px;display:none;z-index:5;align-items:center;gap:8px}
   #score .dot{width:12px;height:12px;border-radius:50%;background:#37d67a;box-shadow:0 0 8px #37d67a}
@@ -88,10 +106,36 @@
     <div id="name"></div>
     <div class="row">
       <button class="chev" id="prev" aria-label="Previous"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
-      <button id="start"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span>PLAY</span></button>
+      <button id="tonext"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg><span>NEXT</span></button>
       <button class="chev" id="next" aria-label="Next"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
     </div>
-    <p id="ver">v31 · multiplayer + voice chat</p>
+    <p id="ver">v32 · multiplayer + voice chat</p>
+  </div>
+</div>
+<div id="select2" style="display:none">
+  <div id="menuCard">
+    <p id="gameLogo">E-LIFE</p>
+    <p id="gameSub">Open-world city roleplay</p>
+    <h1 id="hiName">Hi!</h1>
+    <div id="name2"></div>
+    <button class="menubtn" id="btnPlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span>PLAY</span></button>
+    <button class="menubtn" id="btnSettings"><svg viewBox="0 0 24 24"><path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.5-2-3.5-2.4 1a7.6 7.6 0 0 0-1.7-1L14.9 3h-4l-.4 2.6a7.6 7.6 0 0 0-1.7 1l-2.4-1-2 3.5 2 1.5a7.6 7.6 0 0 0 0 2l-2 1.5 2 3.5 2.4-1a7.6 7.6 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.6 7.6 0 0 0 1.7-1l2.4 1 2-3.5-2-1.5zM12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5z"/></svg><span>SETTINGS</span></button>
+    <button class="menubtn" id="btnAbout"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 15h-2v-6h2zm0-8h-2V7h2z"/></svg><span>ABOUT</span></button>
+    <button class="menubtn" id="btnChars"><svg viewBox="0 0 24 24"><path d="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm-8 0a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-2.7 0-8 1.3-8 4v3h9v-3c0-1 .5-2.5 1.2-3.4A12 12 0 0 0 8 13zm8 0c-.4 0-.9 0-1.3.1a5.2 5.2 0 0 1 1.3 3.4V20h8v-3c0-2.7-5.3-4-8-4z"/></svg><span>CHARACTERS</span></button>
+    <div id="lobby" style="display:none">
+      <div id="countBig">5</div>
+      <div id="lobbyList"></div>
+      <button class="menubtn" id="btnCancel">CANCEL</button>
+    </div>
+    <div id="settingsPanel" style="display:none">
+      <div class="setrow"><span>Graphics</span><div class="seg"><button id="gfxLow">LOW</button><button id="gfxHigh" class="on">HIGH</button></div></div>
+      <div class="setrow"><span>Sound</span><input id="sndRange" type="range" min="0" max="100" value="80"></div>
+      <button class="menubtn" id="btnSetBack">BACK</button>
+    </div>
+    <div id="aboutPanel" style="display:none">
+      <p style="font-size:16px">E-LIFE — open-world city roleplay.<br>Developer: <b>Swampod Sarkar</b></p>
+      <button class="menubtn" id="btnAboutBack">BACK</button>
+    </div>
   </div>
 </div>
 
@@ -456,11 +500,11 @@ function joinGame(){
         seen.add(id);
         let rm = remotes.get(id);
         if (!rm){
-          rm = {id, g:null, mixer:null, acts:{}, curA:null, tx:d.x||0, tz:d.z||0, try_:0, label:null, char:''};
+          rm = {id, g:null, mixer:null, acts:{}, curA:null, tx:d.x||0, tz:d.z||0, try_:0, label:null, char:'', d};
           remotes.set(id, rm);
           loadRemote(rm, d);
         } else {
-          rm.tx = d.x || 0; rm.tz = d.z || 0; rm.ty = d.y || 0; rm.try_ = d.ry || 0; rm.ts = d.ts; rm.vu = d.vu;
+          rm.tx = d.x || 0; rm.tz = d.z || 0; rm.ty = d.y || 0; rm.try_ = d.ry || 0; rm.ts = d.ts; rm.vu = d.vu; rm.d = d;
           if (rm.g && d.anim && rm.curA !== d.anim && rm.acts[d.anim]) rPlay(rm, d.anim);
         }
       });
@@ -579,7 +623,7 @@ function updateVoice(){
     for (const rm of remotes.values()){
       if (rm.vu === au && rm.g){ d = Math.hypot(cur.position.x - rm.g.position.x, cur.position.z - rm.g.position.z); break; }
     }
-    const vol = d < VOICE_RANGE ? 100 : 0;
+    const vol = d < VOICE_RANGE ? 100*SND : 0;
     try { track.setVolume(vol); } catch(e){}
     if (vol > 0) n++;
   }
@@ -656,7 +700,90 @@ async function show(i){
 }
 const cycle = d => { idx = (idx + d + CHARS.length) % CHARS.length; show(idx); };
 prev.onclick = () => cycle(-1); next.onclick = () => cycle(1);
-start.onclick = () => { mode = 'play'; select.style.display='none'; scoreEl.style.display='flex'; micEl.style.display='block'; touchUI(true); toggleEmotes(false); play('Idle'); joinGame(); };
+// ---------- menu flow ----------
+let SND = +(localStorage.getItem('elife_snd') ?? 0.8);
+let savedName = localStorage.getItem('elife_name') || '';
+let savedChar = +(localStorage.getItem('elife_char') ?? 0);
+if (savedChar >= 0 && savedChar < CHARS.length) idx = savedChar;
+const selEl = document.getElementById('select');
+const menuEl = document.getElementById('select2');
+const hiName = document.getElementById('hiName');
+const name2 = document.getElementById('name2');
+const lobbyEl = document.getElementById('lobby');
+const lobbyList = document.getElementById('lobbyList');
+const countBig = document.getElementById('countBig');
+const settingsPanel = document.getElementById('settingsPanel');
+const aboutPanel = document.getElementById('aboutPanel');
+const menuBtns = [...menuEl.querySelectorAll(':scope > button.menubtn')];
+let lobbyTimer = null;
+function showMenu(){
+  myName = (document.getElementById('pname').value || savedName || 'Player').slice(0,12) || 'Player';
+  savedName = myName;
+  localStorage.setItem('elife_name', myName);
+  localStorage.setItem('elife_char', idx);
+  hiName.textContent = 'Hi, ' + myName + '!';
+  name2.textContent = CHARS[idx];
+  selEl.style.display = 'none';
+  menuEl.style.display = 'flex';
+  lobbyEl.style.display = 'none';
+  settingsPanel.style.display = 'none';
+  aboutPanel.style.display = 'none';
+  menuBtns.forEach(b => b.style.display = '');
+}
+document.getElementById('tonext').onclick = showMenu;
+document.getElementById('btnChars').onclick = () => { stopLobby(); menuEl.style.display = 'none'; selEl.style.display = 'flex'; };
+function menuHome(){
+  stopLobby();
+  lobbyEl.style.display = 'none'; settingsPanel.style.display = 'none'; aboutPanel.style.display = 'none';
+  menuBtns.forEach(b => b.style.display = '');
+}
+function stopLobby(){ if (lobbyTimer){ clearInterval(lobbyTimer); lobbyTimer = null; } }
+document.getElementById('btnPlay').onclick = () => {
+  menuBtns.forEach(b => b.style.display = 'none');
+  lobbyEl.style.display = 'block';
+  let n = 5;
+  const draw = () => {
+    countBig.textContent = n;
+    lobbyList.innerHTML = '';
+    const names = [...remotes.values()].slice(0, 9).map(r => (r.d && r.d.name) || '?');
+    [myName + ' (you)', ...names].slice(0, 10).forEach(t => {
+      const d = document.createElement('div'); d.textContent = '🟢 ' + t; lobbyList.appendChild(d);
+    });
+  };
+  draw();
+  lobbyTimer = setInterval(() => {
+    n--;
+    if (n <= 0){ stopLobby(); enterPlay(); return; }
+    draw();
+  }, 1000);
+};
+document.getElementById('btnCancel').onclick = menuHome;
+document.getElementById('btnSettings').onclick = () => { menuBtns.forEach(b => b.style.display = 'none'); settingsPanel.style.display = 'block'; syncSettingsUI(); };
+document.getElementById('btnSetBack').onclick = menuHome;
+document.getElementById('btnAbout').onclick = () => { menuBtns.forEach(b => b.style.display = 'none'); aboutPanel.style.display = 'block'; };
+document.getElementById('btnAboutBack').onclick = menuHome;
+function syncSettingsUI(){
+  document.getElementById('gfxLow').classList.toggle('on', SND_GFX === 'low');
+  document.getElementById('gfxHigh').classList.toggle('on', SND_GFX !== 'low');
+  document.getElementById('sndRange').value = Math.round(SND*100);
+}
+let SND_GFX = localStorage.getItem('elife_gfx') || 'high';
+document.getElementById('gfxLow').onclick = () => { SND_GFX = 'low'; localStorage.setItem('elife_gfx', 'low'); applyGfx(); syncSettingsUI(); };
+document.getElementById('gfxHigh').onclick = () => { SND_GFX = 'high'; localStorage.setItem('elife_gfx', 'high'); applyGfx(); syncSettingsUI(); };
+document.getElementById('sndRange').oninput = e => { SND = e.target.value/100; localStorage.setItem('elife_snd', SND); };
+function applyGfx(){
+  const low = SND_GFX === 'low';
+  renderer.setPixelRatio(low ? 1 : Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = !low;
+  sun.castShadow = !low;
+  scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
+}
+function enterPlay(){
+  mode = 'play';
+  selEl.style.display = 'none'; menuEl.style.display = 'none';
+  scoreEl.style.display = 'flex'; micEl.style.display = 'block';
+  touchUI(true); toggleEmotes(false); play('Idle'); joinGame();
+}
 
 // ---------- driving ----------
 let driving = false, driveCar = null, driveSpeed = 0;
@@ -688,6 +815,7 @@ function toggleCar(){
     driving = false; driveCar = null; driveSpeed = 0;
     dist = 6;
     play('Idle');
+    touchUI(true);
   } else {
     const d = nearestCar();
     if (!d) return;
@@ -705,17 +833,21 @@ function toggleCar(){
     cur.visible = false;
     dist = 9;
     play('Idle');
+    touchUI(true);
   }
 }
 function driveTick(dt, f, r){
   const cp = driveCar.g.position;
-  const joyF = joy.f, joyR = joy.r;
-  const acc = (f + joyF), steerIn = (r + joyR);
+  let acc = f, steer = r;
+  if (carIn.gas) acc = carIn.gear === 'D' ? 1 : -1;
+  if (carIn.l) steer = -1;
+  if (carIn.r) steer = 1;
   if (acc > 0.1) driveSpeed = Math.min(22, driveSpeed + 12*dt*acc);
   else if (acc < -0.1) driveSpeed = Math.max(-8, driveSpeed + 14*dt*acc);
   else driveSpeed *= (1 - Math.min(1, dt*1.2));
+  if (carIn.brake) driveSpeed *= (1 - Math.min(1, dt*4));
   if (Math.abs(driveSpeed) > 0.3){
-    driveCar.g.rotation.y -= steerIn * 1.7 * dt * Math.sign(driveSpeed) * Math.min(1, Math.abs(driveSpeed)/6 + 0.3);
+    driveCar.g.rotation.y -= steer * 1.7 * dt * Math.sign(driveSpeed) * Math.min(1, Math.abs(driveSpeed)/6 + 0.3);
   }
   cp.x += -Math.sin(driveCar.g.rotation.y) * driveSpeed * dt;
   cp.z += -Math.cos(driveCar.g.rotation.y) * driveSpeed * dt;
@@ -744,7 +876,8 @@ function setLock(on){
 document.addEventListener('pointerlockchange', () => { locked = document.pointerLockElement === renderer.domElement; });
 addEventListener('keydown', e => {
   keys[e.code] = true;
-  if (mode === 'select'){ if(e.code==='ArrowLeft') cycle(-1); if(e.code==='ArrowRight') cycle(1); if(e.code==='Enter') start.onclick(); }
+  if (mode === 'select'){ if(e.code==='ArrowLeft') cycle(-1); if(e.code==='ArrowRight') cycle(1);
+  if (e.code==='Enter'){ if (selEl.style.display !== 'none') document.getElementById('tonext').click(); else if (menuEl.style.display !== 'none') document.getElementById('btnPlay').click(); } }
   else {
     if (e.code==='KeyC'){ if (driving) toggleCar(); carPrompt.style.display='none'; mode='select'; select.style.display='flex'; scoreEl.style.display='none'; micEl.style.display='none'; touchUI(false); toggleEmotes(false); setLock(false); play('Wave'); }
     if (e.code==='KeyE') toggleEmotes();
@@ -782,8 +915,28 @@ const btnCar = document.getElementById('btnCar');
 let joyId = null, joyOX = 0, joyOY = 0, camId = null, camLX = 0, camLY = 0;
 function touchUI(on){
   const d = on && IS_TOUCH ? 'block' : 'none';
-  btnJump.style.display = d; btnRun.style.display = d; btnEmote.style.display = d; btnCar.style.display = d;
+  const foot = (on && IS_TOUCH && !driving) ? 'block' : 'none';
+  btnJump.style.display = foot; btnRun.style.display = foot; btnEmote.style.display = foot;
+  document.getElementById('carUI').style.display = (on && IS_TOUCH && driving) ? 'block' : 'none';
+  btnCar.style.display = d;
 }
+// car touch controls: steer arrows + gas + brake + gear
+const carIn = {l:0, r:0, gas:0, brake:0, gear:'D'};
+function holdBtn(el, down, up){
+  el.addEventListener('touchstart', e => { e.stopPropagation(); down(); }, {passive:true});
+  el.addEventListener('touchend', e => { e.stopPropagation(); up(); });
+  el.addEventListener('mousedown', e => { e.stopPropagation(); down(); });
+  el.addEventListener('mouseup', () => up());
+}
+holdBtn(document.getElementById('btnSteerL'), () => carIn.l = 1, () => carIn.l = 0);
+holdBtn(document.getElementById('btnSteerR'), () => carIn.r = 1, () => carIn.r = 0);
+holdBtn(document.getElementById('btnGas'), () => carIn.gas = 1, () => carIn.gas = 0);
+holdBtn(document.getElementById('btnBrake'), () => carIn.brake = 1, () => carIn.brake = 0);
+document.getElementById('btnGear').addEventListener('touchstart', e => {
+  e.stopPropagation();
+  carIn.gear = carIn.gear === 'D' ? 'R' : 'D';
+  document.getElementById('btnGear').textContent = carIn.gear;
+}, {passive:true});
 function isUI(t){
   return t && t.closest && t.closest('button, input, #emotes, #mic, #select, #board');
 }
@@ -885,7 +1038,7 @@ function tick(){
       ensureGrid(cur.position.x, cur.position.z);
     } else {
       yaw = 0;
-      const side = innerWidth > innerHeight ? 1.4 : 0; // landscape: character left
+      const side = innerWidth > innerHeight ? 2.2 : 0; // landscape: character left
       look.set(cur.position.x + side, 1.1, cur.position.z);
       camera.position.set(cur.position.x, 1.4, cur.position.z + 4.2);
     }
@@ -939,7 +1092,13 @@ Promise.all([
       setProg(65 + 35*(i+1)/CHARS.length, 'Loading characters... ' + (i+1) + '/' + CHARS.length);
     }
   })()
-]).then(() => { ensureGrid(0,0); setProg(100, 'Ready!'); setTimeout(() => load.remove(), 300); }).catch(e => {
+]).then(() => { ensureGrid(0,0); applyGfx(); setProg(100, 'Ready!'); setTimeout(() => {
+  load.remove();
+  if (savedName){
+    document.getElementById('pname').value = savedName;
+    showMenu();
+  }
+}, 300); }).catch(e => {
   console.error(e);
   document.getElementById('load').textContent = 'Models failed to load! Open via http://localhost:8000 (' + e.message + ')';
 });
