@@ -253,6 +253,7 @@ function makeChunk(ccx, ccz){
   rx.rotation.x = -Math.PI/2; rx.position.set(x0, 0.02, z0); rx.receiveShadow = true; g.add(rx);
   const rz = new THREE.Mesh(roadGeoZ, roadMat);
   rz.rotation.x = -Math.PI/2; rz.position.set(x0, 0.02, z0); rz.receiveShadow = true; g.add(rz);
+  const onRoad = (x, z) => Math.abs(x - x0) < 5.5 || Math.abs(z - z0) < 5.5;
   const put = (tp, x, z, v, ry, cr) => {
     const c = tp.o.clone();
     c.position.set(x, -tp.minY*v, z);
