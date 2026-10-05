@@ -37,6 +37,9 @@
   .menubtn{width:100%;margin-top:10px;font-size:19px;padding:15px}
   #lobbyList{margin:10px 0;max-height:30vh;overflow:auto;text-align:left;font-size:15px}
   #lobbyList div{padding:6px 10px;background:#ffffff10;border-radius:8px;margin-top:6px}
+  #lobby,#settingsPanel,#aboutPanel{position:fixed;inset:0;z-index:30;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(4,8,18,.92);padding:20px}
+  #lobby > *,#settingsPanel > *,#aboutPanel > *{width:min(430px,94vw)}
+  #countBig{text-align:center}
   #countBig{font-size:64px;font-weight:900;color:#ffd21f;margin:6px 0}
   .setrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;font-size:16px}
   .setrow input[type=range]{flex:1}
@@ -790,13 +793,12 @@ function menuHome(){
 }
 function stopLobby(){ if (lobbyTimer){ clearInterval(lobbyTimer); lobbyTimer = null; } }
 document.getElementById('btnPlay').onclick = () => {
-  try {
-    const de = document.documentElement;
+  try {    const de = document.documentElement;
     if (!document.fullscreenElement && de.requestFullscreen) de.requestFullscreen().catch(()=>{});
     if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(()=>{});
   } catch(e){}
   menuBtns.forEach(b => b.style.display = 'none');
-  lobbyEl.style.display = 'block';
+  lobbyEl.style.display = 'flex';
   let n = 5;
   const draw = () => {
     countBig.textContent = n;
@@ -814,9 +816,9 @@ document.getElementById('btnPlay').onclick = () => {
   }, 1000);
 };
 document.getElementById('btnCancel').onclick = menuHome;
-document.getElementById('btnSettings').onclick = () => { menuBtns.forEach(b => b.style.display = 'none'); settingsPanel.style.display = 'block'; syncSettingsUI(); };
+document.getElementById('btnSettings').onclick = () => { menuBtns.forEach(b => b.style.display = 'none'); settingsPanel.style.display = 'flex'; syncSettingsUI(); };
 document.getElementById('btnSetBack').onclick = menuHome;
-document.getElementById('btnAbout').onclick = () => { menuBtns.forEach(b => b.style.display = 'none'); aboutPanel.style.display = 'block'; };
+document.getElementById('btnAbout').onclick = () => { menuBtns.forEach(b => b.style.display = 'none'); aboutPanel.style.display = 'flex'; };
 document.getElementById('btnAboutBack').onclick = menuHome;
 function syncSettingsUI(){
   document.getElementById('gfxLow').classList.toggle('on', SND_GFX === 'low');
@@ -888,6 +890,14 @@ function toggleCar(){
     d.wheels = {spin:[], steer:[]};
     d.g.traverse(n => {
       if (n.isMesh && /wheel/i.test(n.name)){
+        // recenter pivot so spin/steer rotates in place
+        if (!n.userData.pivoted && n.geometry){
+          n.geometry.computeBoundingBox();
+          const c0 = n.geometry.boundingBox.getCenter(new THREE.Vector3());
+          n.geometry.translate(-c0.x, -c0.y, -c0.z);
+          n.position.add(c0);
+          n.userData.pivoted = true;
+        }
         d.wheels.spin.push(n);
         if (/front/i.test(n.name)) d.wheels.steer.push(n);
       }
