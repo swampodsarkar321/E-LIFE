@@ -46,7 +46,7 @@
 </style>
 </head>
 <body>
-<div id="load">Loading v28...</div>
+<div id="load">Loading v29...</div>
 <div id="rotate">📱 Rotate your phone to landscape<br><span style="font-size:16px">(this game is landscape only)</span></div>
 <div id="joyBase"></div><div id="joyKnob"></div>
 <button class="tbtn" id="btnJump">JUMP</button>
@@ -58,8 +58,8 @@
 <div id="emotes"></div>
 <div id="select">
   <div id="menuCard">
-    <p id="gameLogo">WORLD EXPLORER</p>
-    <p id="gameSub">Open-world roleplay adventure</p>
+    <p id="gameLogo">E-LIFE</p>
+    <p id="gameSub">Open-world city roleplay</p>
     <div class="namerow">
       <svg viewBox="0 0 24 24"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4 0-8 2-8 5v3h16v-3c0-3-4-5-8-5z"/></svg>
       <input id="pname" maxlength="12" placeholder="Your name">
@@ -71,7 +71,7 @@
       <button id="start"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span>PLAY</span></button>
       <button class="chev" id="next" aria-label="Next"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
     </div>
-    <p id="ver">v28 · multiplayer + voice chat</p>
+    <p id="ver">v29 · multiplayer + voice chat</p>
   </div>
 </div>
 
@@ -102,7 +102,7 @@ const firebaseConfig = {
 };
 
 const CHARS = ['Adventurer','Astronaut','Beach Character','Business Man','Casual Character','Farmer','Hoodie Character','King','Punk','Swat','Worker'];
-const SPAWN = {x:2, z:-2};
+const SPAWN = {x:12, z:-12};
 let idx = 0, mode = 'select';
 
 // ---------- scene ----------
@@ -123,15 +123,25 @@ sun.shadow.mapSize.set(2048,2048);
 Object.assign(sun.shadow.camera,{left:-30,right:30,top:30,bottom:-30,near:1,far:120});
 scene.add(sun, sun.target);
 
-// ---------- infinite map + fishing pond ----------
+// ---------- infinite city map ----------
 const CHUNK = 90, RANGE = 1;
 const cv = document.createElement('canvas'); cv.width = cv.height = 256;
 const cx = cv.getContext('2d');
-cx.fillStyle = '#5a9a43'; cx.fillRect(0,0,256,256);
-for (let i=0;i<2500;i++){ cx.fillStyle = `hsl(${90+Math.random()*30},45%,${32+Math.random()*18}%)`; cx.fillRect(Math.random()*256,Math.random()*256,3,3); }
+cx.fillStyle = '#70747c'; cx.fillRect(0,0,256,256);
+for (let i=0;i<2500;i++){ cx.fillStyle = `hsl(220,4%,${38+Math.random()*14}%)`; cx.fillRect(Math.random()*256,Math.random()*256,3,3); }
 const gt = new THREE.CanvasTexture(cv); gt.wrapS = gt.wrapT = THREE.RepeatWrapping; gt.repeat.set(CHUNK/4, CHUNK/4); gt.colorSpace = THREE.SRGBColorSpace;
 const groundGeo = new THREE.PlaneGeometry(CHUNK, CHUNK);
 const groundMat = new THREE.MeshLambertMaterial({map:gt});
+// road texture (asphalt + dashes)
+const rcv = document.createElement('canvas'); rcv.width = 64; rcv.height = 256;
+const rcx = rcv.getContext('2d');
+rcx.fillStyle = '#33373d'; rcx.fillRect(0,0,64,256);
+rcx.fillStyle = '#e8e8e8';
+for (let y = 8; y < 256; y += 42) rcx.fillRect(30, y, 4, 22);
+const roadTx = new THREE.CanvasTexture(rcv); roadTx.wrapS = roadTx.wrapT = THREE.RepeatWrapping; roadTx.repeat.set(1, 6); roadTx.colorSpace = THREE.SRGBColorSpace;
+const roadMat = new THREE.MeshLambertMaterial({map:roadTx});
+const roadGeoX = new THREE.PlaneGeometry(CHUNK, 8);
+const roadGeoZ = new THREE.PlaneGeometry(8, CHUNK);
 
 let seed = 7; const rnd = () => (seed = (seed*16807) % 2147483647) / 2147483647;
 function hashSeed(x,z){ let h = (x*374761393 + z*668265263) | 0; h = Math.imul(h ^ (h>>>13), 1274126177); return h>>>0; }
@@ -139,35 +149,78 @@ function mulberry(a){ return function(){ a|=0; a = a+0x6D2B79F5 | 0; let t = Mat
 const colliders = [];
 const free = (x,z,r) => Math.hypot(x,z) > 8 && colliders.every(c => Math.hypot(c.x-x, c.z-z) > c.r + r + 1);
 
-// walking path + fishing pond
-const pathX = z => 2 + Math.sin((z-2)/4*0.8)*1.5;
-const nearPath = (x,z) => z > -2 && z < 66 && Math.abs(x - pathX(z)) < 3;
-const pond = {x:-45, z:-35, r:9};
-colliders.push({x:pond.x, z:pond.z, r:pond.r+2});
-const water = new THREE.Mesh(new THREE.CircleGeometry(pond.r, 40), new THREE.MeshLambertMaterial({color:0x3fb6e8, transparent:true, opacity:0.55}));
-water.rotation.x = -Math.PI/2; water.position.set(pond.x, 0.06, pond.z); scene.add(water);
+// city streets (roads cross every chunk center)
+const inRoad = (x, z, x0, z0) => Math.abs(x - x0) < 5.5 || Math.abs(z - z0) < 5.5;
 
-const NATURE = [
-  {files:['Tree.glb','Tree-aVOxaHRPWe.glb','Tree-QVOop92WmG.glb','Tree-qZtx0AHhcy.glb','Tree-t9KbsfYdXz.glb'], h:7, n:5, c:0.5, shadow:true},
-  {files:['Pine.glb','Pine-699sFuLCN2.glb','Pine-79gmlLnweB.glb','Pine-rfnxJv0Rqa.glb','Pine-Zt62gceKXZ.glb'], h:8, n:5, c:0.5, shadow:true},
-  {files:['Dead Tree.glb','Dead Tree-CD4edbPSGm.glb','Dead Tree-Mcd2zYqyww.glb','Dead Tree-MlmK5488ou.glb','Dead Tree-n8FhMgMldD.glb'], h:6, n:1, c:0.5, shadow:true},
-  {files:['Twisted Tree.glb','Twisted Tree-7PDBpElkQr.glb','Twisted Tree-8oraKn9m0x.glb','Twisted Tree-9aWlx82xUf.glb','Twisted Tree-GVTsMmuzv7.glb'], h:9, n:2, c:0.7, shadow:true},
-  {files:['Bush.glb'], h:1.1, n:7},
-  {files:['Bush with Flowers.glb'], h:1.1, n:3},
-  {files:['Plant.glb','Plant-xH5gNlQxAZ.glb'], h:0.8, n:5},
-  {files:['Plant Big.glb','Plant Big-MbhbP7JrTI.glb'], h:1.2, n:2},
-  {files:['Fern.glb'], h:0.6, n:4},
-  {files:['Grass.glb','Grass Wispy.glb','Grass Wispy-Msr9zx66VU.glb'], h:0.45, n:16},
-  {files:['Tall Grass.glb'], h:0.7, n:9},
-  {files:['Flower Single.glb','Flower Single-GvfHo0roi3.glb'], h:0.55, n:5},
-  {files:['Flower Group.glb','Flower Group-LqTljN6Wg2.glb'], h:0.6, n:4},
-  {files:['Flower Petal.glb','Flower Petal-LqvxG9OBOU.glb','Flower Petal-eVE0j49ux9.glb','Flower Petal-niuBUEJdvM.glb','Flower Petal-tzG4JcqYWs.glb'], h:0.35, n:4},
-  {files:['Clover.glb','Clover-u5SOgBFiut.glb'], h:0.25, n:6},
-  {files:['Mushroom.glb','Mushroom Laetiporus.glb'], h:0.4, n:2},
-  {files:['Rock Medium.glb','Rock Medium-JQxF95498B.glb','Rock Medium-s1OJ3bBzqc.glb'], h:1.4, n:4, c:1.0, shadow:true},
-  {files:['Pebble Round.glb','Pebble Round-KYtJ6JNXh2.glb','Pebble Round-icVsN3lmVy.glb','Pebble Round-kAMfq1uJUY.glb','Pebble Round-nMf8LHOsbM.glb','Pebble Square.glb','Pebble Square-2YtLzwgsWp.glb','Pebble Square-6juX57sLHe.glb','Pebble Square-Mm4RMgwNO8.glb','Pebble Square-l5XiYQj1oD.glb','Pebble Square-s71L3q1nXN.glb'], h:0.3, n:8},
+const CITY_BLDG = [
+  {files:['Big Building.glb'], h:22, n:1, c:6, shadow:true},
+  {files:['Brown Building.glb'], h:14, n:2, c:5, shadow:true},
+  {files:['Building Green.glb'], h:12, n:2, c:5, shadow:true},
+  {files:['Building Red.glb','Building Red Corner.glb'], h:12, n:2, c:5, shadow:true},
 ];
-const PATH_FILES = ['Rock Path Square Wide.glb','Rock Path Square Thin.glb','Rock Path Square Smal.glb','Rock Path Square Smal-cI9XBpVijV.glb','Rock Path Square Smal-w4TKZMjjcw.glb','Rock Path Round Wide.glb','Rock Path Round Thin.glb','Rock Path Round Small.glb','Rock Path Round Small-GMttpOEFKT.glb','Rock Path Round Small-yHEdadj5I0.glb'];
+const CITY_PROPS = [
+  {files:['Bus Stop.glb'], h:2.6, n:1, c:1.2},
+  {files:['Traffic Light.glb'], h:4.5, n:2},
+  {files:['Bench.glb'], h:1, n:3},
+  {files:['Billboard.glb'], h:6, n:1, c:1},
+  {files:['ATM.glb'], h:1.8, n:1},
+  {files:['Fire hydrant.glb'], h:0.8, n:2},
+  {files:['Trash Can.glb'], h:1, n:3},
+  {files:['Mailbox.glb'], h:1.2, n:1},
+  {files:['Bus stop sign.glb'], h:2.5, n:1},
+  {files:['Stop sign.glb'], h:2.2, n:1},
+  {files:['Fence Piece.glb','Fence.glb','Fence End.glb'], h:1.2, n:5},
+  {files:['Planter & Bushes.glb','Flower Pot.glb','Flower Pot-Kgt363WkKd.glb'], h:1, n:4},
+  {files:['Tree.glb'], h:3.5, n:6, c:0.4},
+  {files:['Cone.glb'], h:0.8, n:4},
+  {files:['Box.glb'], h:0.8, n:3},
+  {files:['Dumpster.glb'], h:1.5, n:1, c:1},
+  {files:['Power Box.glb'], h:1.2, n:1},
+  {files:['Washing Line.glb'], h:2.5, n:1},
+];
+const CITY_CARS = [
+  {files:['Car.glb','Car-unqqkULtRU.glb','SUV.glb','Van.glb'], h:1.6, n:3, c:2.2},
+  {files:['Sports Car.glb','Sports Car-Gzj704DXdr.glb'], h:1.4, n:1, c:2.2},
+  {files:['Bus.glb'], h:3, n:1, c:4},
+  {files:['Pickup Truck.glb'], h:2, n:1, c:2.4},
+  {files:['Police Car.glb'], h:1.6, n:1, c:2.2},
+  {files:['Motorcycle.glb','Bicycle.glb'], h:1.2, n:2},
+];
+
+const CITY_BLDG = [
+  {files:['Big Building.glb'], h:22, n:1, c:6, shadow:true},
+  {files:['Brown Building.glb'], h:14, n:2, c:5, shadow:true},
+  {files:['Building Green.glb'], h:12, n:2, c:5, shadow:true},
+  {files:['Building Red.glb','Building Red Corner.glb'], h:12, n:2, c:5, shadow:true},
+];
+const CITY_PROPS = [
+  {files:['Bus Stop.glb'], h:2.6, n:1, c:1.2},
+  {files:['Traffic Light.glb'], h:4.5, n:2},
+  {files:['Bench.glb'], h:1, n:3},
+  {files:['Billboard.glb'], h:6, n:1, c:1},
+  {files:['ATM.glb'], h:1.8, n:1},
+  {files:['Fire hydrant.glb'], h:0.8, n:2},
+  {files:['Trash Can.glb'], h:1, n:3},
+  {files:['Mailbox.glb'], h:1.2, n:1},
+  {files:['Bus stop sign.glb'], h:2.5, n:1},
+  {files:['Stop sign.glb'], h:2.2, n:1},
+  {files:['Fence Piece.glb','Fence.glb','Fence End.glb'], h:1.2, n:5},
+  {files:['Planter & Bushes.glb','Flower Pot.glb','Flower Pot-Kgt363WkKd.glb'], h:1, n:4},
+  {files:['Tree.glb'], h:3.5, n:6, c:0.4},
+  {files:['Cone.glb'], h:0.8, n:4},
+  {files:['Box.glb'], h:0.8, n:3},
+  {files:['Dumpster.glb'], h:1.5, n:1, c:1},
+  {files:['Power Box.glb'], h:1.2, n:1},
+  {files:['Washing Line.glb'], h:2.5, n:1},
+];
+const CITY_CARS = [
+  {files:['Car.glb','Car-unqqkULtRU.glb','SUV.glb','Van.glb'], h:1.6, n:3, c:2.2, road:true},
+  {files:['Sports Car.glb','Sports Car-Gzj704DXdr.glb'], h:1.4, n:1, c:2.2, road:true},
+  {files:['Bus.glb'], h:3, n:1, c:4, road:true},
+  {files:['Pickup Truck.glb'], h:2, n:1, c:2.4, road:true},
+  {files:['Police Car.glb'], h:1.6, n:1, c:2.2, road:true},
+  {files:['Motorcycle.glb','Bicycle.glb'], h:1.2, n:2, road:true},
+];
 function loadTreeFile(f){
   return new Promise((res, rej) => loader.load(f, res, undefined, rej));
 }
@@ -179,30 +232,19 @@ function prepTreeModel(g, targetH, byWidth){
   o.scale.multiplyScalar(s0); o.updateMatrixWorld(true);
   return {o, minY:new THREE.Box3().setFromObject(o).min.y};
 }
-const tplNature = [];
-let tplPath = [];
+const tplCity = [];
 let tplReady = false;
 async function loadTemplates(onStep){
   const jobs = [];
-  for (const t of NATURE) for (const f of t.files) jobs.push({t, f:'tree/' + encodeURIComponent(f)});
-  for (const f of PATH_FILES) jobs.push({f:'tree/' + encodeURIComponent(f), path:true});
-  for (const f of FISH_CATCH) jobs.push({f:'FISH/' + encodeURIComponent(f.n + '.glb'), fish:f});
-  jobs.push({f:'FISH/' + encodeURIComponent('Dock Long.glb'), dock:true});
-  jobs.push({f:'FISH/' + encodeURIComponent('Boat.glb'), boat:true});
+  const all = [...CITY_BLDG, ...CITY_PROPS, ...CITY_CARS];
+  for (const t of all) for (const f of t.files) jobs.push({t, f:'CITY/' + encodeURIComponent(f)});
   const byEntry = new Map();
   let done = 0;
   for (const j of jobs){
     try {
       const g = await loadTreeFile(j.f);
-      if (j.path) tplPath.push(prepTreeModel(g, 0, true));
-      else if (j.fish){
-        const p = prepFish(g, 0.8);
-        p.n = j.f.n; p.bn = j.f.bn; p.w = j.f.w; p.kg = j.f.kg;
-        tplFish.push(p);
-      }
-      else if (j.dock){ dockTpl = prepTreeModel(g, 1.2, false); }
-      else if (j.boat){ boatTpl = prepFish(g, 2.2); }
-      else {
+      {
+        const p = prepTreeModel(g, j.t.h, false);
         const p = prepTreeModel(g, j.t.h, false);
         p.o.traverse(m => { if (m.isMesh) m.castShadow = !!j.t.shadow; });
         if (!byEntry.has(j.t)) byEntry.set(j.t, []);
@@ -211,15 +253,9 @@ async function loadTemplates(onStep){
     } catch(e){ console.error('load failed:', j.f, e); }
     done++; onStep && onStep(done, jobs.length);
   }
-  for (const t of NATURE) tplNature.push({t, models:byEntry.get(t) || []});
+  for (const t of all) tplCity.push({t, models:byEntry.get(t) || []});
   tplReady = true;
 }
-// shared house assets
-const wallC=[0xe8d9b5,0xd9a37a,0xb5c9d9,0xe0b5b5], roofC=[0x8b2f2f,0x4a4a6a,0x6a4a2a];
-const houseBoxGeo = new THREE.BoxGeometry(1,1,1);
-const houseRoofGeo = new THREE.ConeGeometry(1,1,4);
-const houseWallMats = wallC.map(c => new THREE.MeshLambertMaterial({color:c}));
-const houseRoofMats = roofC.map(c => new THREE.MeshLambertMaterial({color:c}));
 const chunks = new Map();
 function makeChunk(ccx, ccz){
   const key = ccx + ',' + ccz;
@@ -232,48 +268,69 @@ function makeChunk(ccx, ccz){
   ground.position.set(x0, 0, z0);
   ground.receiveShadow = true;
   g.add(ground);
-  for (const entry of tplNature){
+  // roads: cross through chunk center
+  const rx = new THREE.Mesh(roadGeoX, roadMat);
+  rx.rotation.x = -Math.PI/2; rx.position.set(x0, 0.02, z0); rx.receiveShadow = true; g.add(rx);
+  const rz = new THREE.Mesh(roadGeoZ, roadMat);
+  rz.rotation.x = -Math.PI/2; rz.position.set(x0, 0.02, z0); rz.receiveShadow = true; g.add(rz);
+  const put = (tp, x, z, v, ry, cr) => {
+    const c = tp.o.clone();
+    c.position.set(x, -tp.minY*v, z);
+    c.rotation.y = ry;
+    c.scale.multiplyScalar(v);
+    g.add(c);
+    if (cr){ const o2 = {x, z, r:cr}; colliders.push(o2); coll.push(o2); }
+  };
+  for (const entry of tplCity.filter(e => CITY_BLDG.includes(e.t))){
+    const t = entry.t, models = entry.models;
+    if (!models.length) continue;
+    for (const qx of [-1,1]) for (const qz of [-1,1]){
+      if (R() > 0.55) continue;
+      for (let tries = 0; tries < 8; tries++){
+        const x = x0 + qx*(14 + R()*24), z = z0 + qz*(14 + R()*24);
+        const v = 0.9 + R()*0.5, cr = (t.c || 5)*v;
+        if (!free(x,z,cr)) continue;
+        const tp = models[Math.floor(R()*models.length)];
+        put(tp, x, z, v, Math.floor(R()*4)*Math.PI/2, cr);
+        break;
+      }
+    }
+  }
+  // props on sidewalks (near road edges, off-road)
+  for (const entry of tplCity.filter(e => CITY_PROPS.includes(e.t))){
     const t = entry.t, models = entry.models;
     if (!models.length) continue;
     for (let i = 0, tries = 0; i < t.n && tries < t.n*10; tries++){
-      const x = x0 + (R()-0.5)*CHUNK*0.94, z = z0 + (R()-0.5)*CHUNK*0.94;
-      if (nearPath(x,z)) continue;
-      const v = 0.8 + R()*0.5, cr = (t.c || 0) * v;
-      if (cr ? !free(x,z,cr) : Math.hypot(x,z) < 8) continue;
+      const side = R() < 0.5;
+      const along = (R()-0.5)*CHUNK*0.9;
+      const off = 6 + R()*3;
+      const sgn = R() < 0.5 ? -1 : 1;
+      const x = side ? x0 + along : x0 + sgn*off;
+      const z = side ? z0 + sgn*off : z0 + along;
+      if (onRoad(x, z) || Math.hypot(x,z) < 8) continue;
+      const v = 0.9 + R()*0.3, cr = (t.c || 0)*v;
+      if (cr && !free(x,z,cr)) continue;
       const tp = models[Math.floor(R()*models.length)];
-      const c = tp.o.clone();
-      c.position.set(x, -tp.minY*v, z);
-      c.rotation.y = R()*Math.PI*2;
-      c.scale.multiplyScalar(v);
-      g.add(c);
-      if (cr){ const o2 = {x, z, r:cr}; colliders.push(o2); coll.push(o2); }
+      put(tp, x, z, v, R()*Math.PI*2, cr);
       i++;
     }
   }
-  const nH = 1 + (R() < 0.5 ? 1 : 0);
-  for (let c = 0, tries = 0; c < nH && tries < 40; tries++){
-    const x = x0 + (R()-0.5)*CHUNK*0.8, z = z0 + (R()-0.5)*CHUNK*0.8;
-    if (nearPath(x,z)) continue;
-    const w = 5+R()*3, d = 5+R()*3, h = 3.5;
-    if (!free(x,z,Math.max(w,d)*0.8)) continue;
-    const hg = new THREE.Group();
-    const b = new THREE.Mesh(houseBoxGeo, houseWallMats[Math.floor(R()*houseWallMats.length)]);
-    b.scale.set(w,h,d); b.position.y = h/2; b.castShadow = b.receiveShadow = true;
-    const md = Math.max(w,d);
-    const rf = new THREE.Mesh(houseRoofGeo, houseRoofMats[Math.floor(R()*houseRoofMats.length)]);
-    rf.scale.set(md*0.78, 2.5, md*0.78); rf.position.y = h+1.25; rf.rotation.y = Math.PI/4; rf.castShadow = true;
-    hg.add(b,rf); hg.position.set(x,0,z); hg.rotation.y = Math.floor(R()*4)*Math.PI/2; g.add(hg);
-    const o2 = {x, z, r:md*0.5*1.05}; colliders.push(o2); coll.push(o2); c++;
-  }
-  if (ccx === 0 && tplPath.length){
-    const lo = Math.max(2, z0-CHUNK/2), hi = Math.min(62, z0+CHUNK/2);
-    for (let k = Math.ceil((lo-2)/4); 2+k*4 <= hi; k++){
-      const z = 2+k*4, x = pathX(z);
-      const t = tplPath[Math.floor(R()*tplPath.length)];
-      const c = t.o.clone();
-      c.position.set(x, -t.minY + 0.03, z);
-      c.rotation.y = R()*0.4;
-      g.add(c);
+  // parked cars along roads
+  for (const entry of tplCity.filter(e => CITY_CARS.includes(e.t))){
+    const t = entry.t, models = entry.models;
+    if (!models.length) continue;
+    for (let i = 0, tries = 0; i < t.n && tries < t.n*10; tries++){
+      const alongX = R() < 0.5;
+      const a = (R()-0.5)*CHUNK*0.85;
+      const lane = R() < 0.5 ? -6.2 : 6.2;
+      const x = alongX ? x0 + a : x0 + lane;
+      const z = alongX ? z0 + lane : z0 + a;
+      if (Math.hypot(x,z) < 9) continue;
+      const v = 0.95 + R()*0.2, cr = (t.c || 2)*v;
+      if (!free(x,z,cr)) continue;
+      const tp = models[Math.floor(R()*models.length)];
+      put(tp, x, z, v, alongX ? (lane > 0 ? Math.PI/2 : -Math.PI/2) : (lane > 0 ? 0 : Math.PI), cr);
+      i++;
     }
   }
   g.userData.coll = coll;
@@ -299,50 +356,6 @@ function ensureGrid(px, pz){
   for (const key of [...chunks.keys()]){
     const parts = key.split(',');
     if (Math.abs(+parts[0]-pcx) > RANGE || Math.abs(+parts[1]-pcz) > RANGE) dropChunk(key);
-  }
-}
-// ---------- pond visuals + swim fish ----------
-const FISH_CATCH = [
-  {n:'Goldfish', bn:'গোল্ডফিশ', w:30, kg:[0.2,0.8]},
-  {n:'Betta', bn:'বেটা', w:25, kg:[0.1,0.5]},
-  {n:'Tetra', bn:'টেট্রা', w:20, kg:[0.1,0.4]},
-  {n:'Clownfish', bn:'ক্লাউনফিশ', w:18, kg:[0.2,0.6]},
-  {n:'Blue Tang', bn:'ব্লু ট্যাং', w:15, kg:[0.3,1.0]},
-  {n:'Koi', bn:'কই', w:12, kg:[0.5,1.5]},
-  {n:'Puffer', bn:'পটকা', w:10, kg:[0.5,1.2]},
-  {n:'Piranha', bn:'পিরানহা', w:8, kg:[0.5,1.5]},
-  {n:'Red Snapper', bn:'রেড স্ন্যাপার', w:6, kg:[1,2.5]},
-  {n:'Tuna', bn:'টুনা', w:4, kg:[1.5,3]},
-  {n:'Swordfish', bn:'সোর্ডফিশ', w:2, kg:[2,4]},
-  {n:'Shark', bn:'হাঙর!', w:1, kg:[3,6]},
-];
-const tplFish = [];
-let dockTpl = null, boatTpl = null;
-let boatMesh = null;
-function prepFish(g, targetLen){
-  const o = g.scene;
-  o.updateMatrixWorld(true);
-  const size = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3());
-  o.scale.multiplyScalar(targetLen / Math.max(size.x, size.y, size.z, 0.01));
-  o.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(o);
-  return {o, minY:box.min.y};
-}
-function setupPondLife(){
-  // dock toward spawn
-  if (dockTpl){
-    const d = dockTpl.o.clone();
-    const ang = Math.atan2(SPAWN.x - pond.x, SPAWN.z - pond.z);
-    d.position.set(pond.x + Math.sin(ang)*(pond.r+0.5), -dockTpl.minY, pond.z + Math.cos(ang)*(pond.r+0.5));
-    d.rotation.y = ang + Math.PI;
-    scene.add(d);
-  }
-  // boat floating
-  if (boatTpl){
-    boatMesh = boatTpl.o.clone();
-    boatMesh.position.set(pond.x + 3, 0.05, pond.z - 2);
-    boatMesh.rotation.y = 0.7;
-    scene.add(boatMesh);
   }
 }
 // clouds
@@ -817,11 +830,6 @@ function tick(){
     if (c.g.position.z-pz > 180) c.g.position.z -= 360;
     if (c.g.position.z-pz < -180) c.g.position.z += 360;
   }
-  // pond life: boat bob
-  {
-    const tNow = performance.now()/1000;
-    if (boatMesh){ boatMesh.position.y = 0.05 + Math.sin(tNow*1.2)*0.06; boatMesh.rotation.z = Math.sin(tNow*0.9)*0.03; }
-  }
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }
@@ -831,7 +839,7 @@ tick();
 Promise.all([
   show(0),
   loadTemplates((d,n) => { load.textContent = 'Building world... ' + d + '/' + n; })
-]).then(() => { ensureGrid(0,0); setupPondLife(); load.remove(); CHARS.forEach(n => loadChar(n).catch(()=>{})); }).catch(e => {
+]).then(() => { ensureGrid(0,0); load.remove(); CHARS.forEach(n => loadChar(n).catch(()=>{})); }).catch(e => {
   console.error(e);
   document.getElementById('load').textContent = 'Models failed to load! Open via http://localhost:8000 (' + e.message + ')';
 });
