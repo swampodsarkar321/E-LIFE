@@ -53,6 +53,8 @@
   #btnEmote{right:20px;bottom:200px}
   #voice{position:fixed;right:12px;bottom:14px;font-size:15px;font-weight:700;background:#1b5e20;padding:10px 16px;border-radius:12px;display:none;z-index:5;align-items:center;gap:8px}
   #mic{position:fixed;left:12px;top:12px;font-size:22px;font-weight:700;background:#0008;padding:12px 16px;border-radius:50%;display:none;z-index:5;cursor:pointer;width:56px;height:56px;text-align:center;line-height:32px}
+  #carPrompt{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);font-size:19px;font-weight:700;background:#1565c0;padding:10px 22px;border-radius:12px;display:none;z-index:5}
+  #btnCar{right:108px;bottom:120px}
 </style>
 </head>
 <body>
@@ -68,6 +70,8 @@
 <button class="tbtn" id="btnJump">JUMP</button>
 <button class="tbtn" id="btnRun">RUN</button>
 <button class="tbtn" id="btnEmote">🕺</button>
+<button class="tbtn" id="btnCar">🚗</button>
+<div id="carPrompt"></div>
 <div id="score"><span class="dot"></span><span id="scoreTx">online: 1</span></div>
 <div id="voice"><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg><span>Someone nearby — talk!</span></div>
 <div id="mic" title="Mic"><svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.93V21h2v-3.07A7 7 0 0 0 19 11h-2z"/></svg></div>
@@ -187,13 +191,14 @@ const CITY_PROPS = [
   {files:['Washing Line.glb'], h:2.5, n:1},
 ];
 const CITY_CARS = [
-  {files:['Car.glb','Car-unqqkULtRU.glb','SUV.glb','Van.glb'], h:1.6, n:3, c:2.2, road:true},
-  {files:['Sports Car.glb','Sports Car-Gzj704DXdr.glb'], h:1.4, n:1, c:2.2, road:true},
-  {files:['Bus.glb'], h:3, n:1, c:4, road:true},
-  {files:['Pickup Truck.glb'], h:2, n:1, c:2.4, road:true},
-  {files:['Police Car.glb'], h:1.6, n:1, c:2.2, road:true},
-  {files:['Motorcycle.glb','Bicycle.glb'], h:1.2, n:2, road:true},
+  {files:['Car.glb','Car-unqqkULtRU.glb','SUV.glb','Van.glb'], h:1.6, n:3, c:2.2, drive:true},
+  {files:['Sports Car.glb','Sports Car-Gzj704DXdr.glb'], h:1.4, n:1, c:2.2, drive:true},
+  {files:['Bus.glb'], h:3, n:1, c:4, drive:true},
+  {files:['Pickup Truck.glb'], h:2, n:1, c:2.4, drive:true},
+  {files:['Police Car.glb'], h:1.6, n:1, c:2.2, drive:true},
+  {files:['Motorcycle.glb','Bicycle.glb'], h:1.2, n:2},
 ];
+const driveables = [];
 function loadTreeFile(f){
   return new Promise((res, rej) => loader.load(f, res, undefined, rej));
 }
@@ -273,7 +278,9 @@ function makeChunk(ccx, ccz){
     c.rotation.y = ry;
     c.scale.multiplyScalar(v);
     g.add(c);
-    if (cr){ const o2 = {x, z, r:cr}; colliders.push(o2); coll.push(o2); }
+    let o2 = null;
+    if (cr){ o2 = {x, z, r:cr}; o2.obj = c; c.userData.coll = o2; colliders.push(o2); coll.push(o2); }
+    return c;
   };
   for (const entry of tplCity.filter(e => CITY_BLDG.includes(e.t))){
     const t = entry.t, models = entry.models;
@@ -323,7 +330,8 @@ function makeChunk(ccx, ccz){
       const v = 0.95 + R()*0.2, cr = (t.c || 2)*v;
       if (!free(x,z,cr)) continue;
       const tp = models[Math.floor(R()*models.length)];
-      put(tp, x, z, v, alongX ? (lane > 0 ? Math.PI/2 : -Math.PI/2) : (lane > 0 ? 0 : Math.PI), cr);
+      const cc = put(tp, x, z, v, alongX ? (lane > 0 ? Math.PI/2 : -Math.PI/2) : (lane > 0 ? 0 : Math.PI), cr);
+      if (t.drive) driveables.push({g:cc, chunk:key});
       i++;
     }
   }
@@ -335,6 +343,7 @@ function dropChunk(key){
   const g = chunks.get(key); if (!g) return;
   scene.remove(g);
   for (const c of g.userData.coll){ const i = colliders.indexOf(c); if (i >= 0) colliders.splice(i,1); }
+  for (let i = driveables.length-1; i >= 0; i--) if (driveables[i].chunk === key) driveables.splice(i,1);
   chunks.delete(key);
 }
 let lastCX = 1e9, lastCZ = 1e9;
@@ -649,6 +658,81 @@ const cycle = d => { idx = (idx + d + CHARS.length) % CHARS.length; show(idx); }
 prev.onclick = () => cycle(-1); next.onclick = () => cycle(1);
 start.onclick = () => { mode = 'play'; select.style.display='none'; scoreEl.style.display='flex'; micEl.style.display='block'; touchUI(true); toggleEmotes(false); play('Idle'); joinGame(); };
 
+// ---------- driving ----------
+let driving = false, driveCar = null, driveSpeed = 0;
+const carPrompt = document.getElementById('carPrompt');
+function nearestCar(){
+  if (!cur) return null;
+  let best = null, bd = 3.5;
+  for (const d of driveables){
+    const dd = Math.hypot(cur.position.x - d.g.position.x, cur.position.z - d.g.position.z);
+    if (dd < bd){ bd = dd; best = d; }
+  }
+  return best;
+}
+function toggleCar(){
+  if (mode !== 'play' || !cur) return;
+  if (driving && driveCar){
+    const cp = driveCar.g.position;
+    const a = driveCar.g.rotation.y;
+    cur.position.set(cp.x + Math.cos(a)*2.2, 0, cp.z - Math.sin(a)*2.2);
+    cur.visible = true;
+    // re-register car where left
+    const o2 = {x:cp.x, z:cp.z, r:driveCar.cr};
+    o2.obj = driveCar.g; driveCar.g.userData.coll = o2;
+    colliders.push(o2);
+    const key = Math.floor(cp.x/CHUNK+0.5) + ',' + Math.floor(cp.z/CHUNK+0.5);
+    const ch = chunks.get(key);
+    if (ch){ ch.attach(driveCar.g); ch.userData.coll.push(o2); driveCar.chunk = key; }
+    driveables.push(driveCar);
+    driving = false; driveCar = null; driveSpeed = 0;
+    dist = 6;
+    play('Idle');
+  } else {
+    const d = nearestCar();
+    if (!d) return;
+    // remove stale parked collider
+    const oc = d.g.userData.coll;
+    if (oc){
+      let i = colliders.indexOf(oc); if (i >= 0) colliders.splice(i,1);
+      const ch = chunks.get(d.chunk);
+      if (ch){ i = ch.userData.coll.indexOf(oc); if (i >= 0) ch.userData.coll.splice(i,1); }
+    }
+    for (let i = driveables.length-1; i >= 0; i--) if (driveables[i] === d) driveables.splice(i,1);
+    scene.attach(d.g);
+    d.cr = oc ? oc.r : 2;
+    driving = true; driveCar = d; driveSpeed = 0;
+    cur.visible = false;
+    dist = 9;
+    play('Idle');
+  }
+}
+function driveTick(dt, f, r){
+  const cp = driveCar.g.position;
+  const joyF = joy.f, joyR = joy.r;
+  const acc = (f + joyF), steerIn = (r + joyR);
+  if (acc > 0.1) driveSpeed = Math.min(22, driveSpeed + 12*dt*acc);
+  else if (acc < -0.1) driveSpeed = Math.max(-8, driveSpeed + 14*dt*acc);
+  else driveSpeed *= (1 - Math.min(1, dt*1.2));
+  if (Math.abs(driveSpeed) > 0.3){
+    driveCar.g.rotation.y -= steerIn * 1.7 * dt * Math.sign(driveSpeed) * Math.min(1, Math.abs(driveSpeed)/6 + 0.3);
+  }
+  cp.x += -Math.sin(driveCar.g.rotation.y) * driveSpeed * dt;
+  cp.z += -Math.cos(driveCar.g.rotation.y) * driveSpeed * dt;
+  const myColl = driveCar.g.userData.coll;
+  for (const c of colliders){
+    if (c === myColl) continue;
+    const ox = cp.x - c.x, oz = cp.z - c.z, dd = Math.hypot(ox,oz), min = c.r + 1.4;
+    if (dd < min && dd > 0.01){ cp.x = c.x + ox/dd*min; cp.z = c.z + oz/dd*min; driveSpeed *= 0.4; }
+  }
+  if (myColl){ myColl.x = cp.x; myColl.z = cp.z; }
+  cur.position.set(cp.x, 0, cp.z); // player rides along (hidden)
+  cur.rotation.y = driveCar.g.rotation.y;
+  yaw = -driveCar.g.rotation.y + Math.PI;
+  carPrompt.textContent = 'F — get out (' + Math.abs(Math.round(driveSpeed*3.6)) + ' km/h)';
+  carPrompt.style.display = 'block';
+}
+
 // ---------- input ----------
 const keys = {};
 let locked = false;
@@ -662,8 +746,9 @@ addEventListener('keydown', e => {
   keys[e.code] = true;
   if (mode === 'select'){ if(e.code==='ArrowLeft') cycle(-1); if(e.code==='ArrowRight') cycle(1); if(e.code==='Enter') start.onclick(); }
   else {
-    if (e.code==='KeyC'){ mode='select'; select.style.display='flex'; scoreEl.style.display='none'; micEl.style.display='none'; touchUI(false); toggleEmotes(false); setLock(false); play('Wave'); }
+    if (e.code==='KeyC'){ if (driving) toggleCar(); carPrompt.style.display='none'; mode='select'; select.style.display='flex'; scoreEl.style.display='none'; micEl.style.display='none'; touchUI(false); toggleEmotes(false); setLock(false); play('Wave'); }
     if (e.code==='KeyE') toggleEmotes();
+    if (e.code==='KeyF') toggleCar();
     if (e.code==='KeyM') toggleMic();
     if (e.code==='Space') jumpBuf = 0.12;
     if (e.code==='Escape') toggleEmotes(false);
@@ -693,10 +778,11 @@ const joyKnob = document.getElementById('joyKnob');
 const btnJump = document.getElementById('btnJump');
 const btnRun = document.getElementById('btnRun');
 const btnEmote = document.getElementById('btnEmote');
+const btnCar = document.getElementById('btnCar');
 let joyId = null, joyOX = 0, joyOY = 0, camId = null, camLX = 0, camLY = 0;
 function touchUI(on){
   const d = on && IS_TOUCH ? 'block' : 'none';
-  btnJump.style.display = d; btnRun.style.display = d; btnEmote.style.display = d;
+  btnJump.style.display = d; btnRun.style.display = d; btnEmote.style.display = d; btnCar.style.display = d;
 }
 function isUI(t){
   return t && t.closest && t.closest('button, input, #emotes, #mic, #select, #board');
@@ -744,6 +830,7 @@ document.addEventListener('touchcancel', touchEnd);
 btnJump.addEventListener('touchstart', e => { e.stopPropagation(); jumpBuf = 0.12; }, {passive:true});
 btnRun.addEventListener('touchstart', e => { e.stopPropagation(); joy.run = !joy.run; btnRun.style.background = joy.run ? '#2e7d32' : '#0009'; }, {passive:true});
 btnEmote.addEventListener('touchstart', e => { e.stopPropagation(); toggleEmotes(); }, {passive:true});
+btnCar.addEventListener('touchstart', e => { e.stopPropagation(); toggleCar(); }, {passive:true});
 
 // ---------- loop ----------
 const clock = new THREE.Clock(), look = new THREE.Vector3();
@@ -757,6 +844,8 @@ function tick(){
       if (mag > 1){ f /= mag; r /= mag; }
       const moving = mag > 0.15;
       const airborne = cur.position.y > 0.02 || vy !== 0;
+      if (driving && driveCar){ driveTick(dt, f, r); }
+      else {
       if (moving){
         const run = keys.ShiftLeft || keys.ShiftRight || joy.run;
         let sp = (run ? 8 : 3.5) * Math.min(1, Math.max(mag, 0.45));
@@ -785,7 +874,13 @@ function tick(){
         const ox = cur.position.x - c.x, oz = cur.position.z - c.z, dd = Math.hypot(ox,oz), min = c.r + .4;
         if (dd < min && dd > 0){ cur.position.x = c.x + ox/dd*min; cur.position.z = c.z + oz/dd*min; }
       }
-      look.set(cur.position.x, 1.5, cur.position.z);
+      } // end walk mode
+      const focus = (driving && driveCar) ? driveCar.g.position : cur.position;
+      look.set(focus.x, 1.5 + ((driving && driveCar) ? 1 : 0), focus.z);
+      if (!driving && mode === 'play' && nearestCar()){
+        carPrompt.textContent = 'F — drive';
+        carPrompt.style.display = 'block';
+      } else if (!driving) carPrompt.style.display = 'none';
       camera.position.set(look.x + Math.sin(yaw)*Math.cos(pitch)*dist, look.y + Math.sin(pitch)*dist, look.z + Math.cos(yaw)*Math.cos(pitch)*dist);
       ensureGrid(cur.position.x, cur.position.z);
     } else {
