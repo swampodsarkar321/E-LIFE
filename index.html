@@ -3,6 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a1122">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
 <title>Open World Explorer</title>
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#9fd3f0;font-family:system-ui,sans-serif;color:#fff;touch-action:none;-webkit-user-select:none;user-select:none}
@@ -89,6 +95,13 @@
 <button class="tbtn" id="btnRun">RUN</button>
 <button class="tbtn" id="btnEmote">🕺</button>
 <button class="tbtn" id="btnCar">🚗</button>
+<div id="carUI">
+  <button class="cbtn" id="btnSteerL">◀</button>
+  <button class="cbtn" id="btnSteerR">▶</button>
+  <button class="cbtn" id="btnGas">▲</button>
+  <button class="cbtn" id="btnBrake">▼</button>
+  <button class="cbtn" id="btnGear">D</button>
+</div>
 <div id="carPrompt"></div>
 <div id="score"><span class="dot"></span><span id="scoreTx">online: 1</span></div>
 <div id="voice"><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg><span>Someone nearby — talk!</span></div>
@@ -375,7 +388,7 @@ function makeChunk(ccx, ccz){
       if (!free(x,z,cr)) continue;
       const tp = models[Math.floor(R()*models.length)];
       const cc = put(tp, x, z, v, alongX ? (lane > 0 ? Math.PI/2 : -Math.PI/2) : (lane > 0 ? 0 : Math.PI), cr);
-      if (t.drive) driveables.push({g:cc, chunk:key});
+      if (t.drive) driveables.push({g:cc, chunk:key, label:t.files[0]});
       i++;
     }
   }
@@ -489,7 +502,7 @@ function joinGame(){
     const app = initializeApp(firebaseConfig);
     db = getDatabase(app);
     const me = ref(db, 'players/' + myId);
-    set(me, {name:myName, char:CHARS[idx], x:cur.position.x, z:cur.position.z, ry:cur.rotation.y, anim:'Idle', vu:myUid, ts:Date.now()});
+    set(me, {name:myName, char:CHARS[idx], x:cur.position.x, z:cur.position.z, ry:cur.rotation.y, anim:'Idle', vu:myUid, car:null, ts:Date.now()});
     onDisconnect(me).remove();    onValue(ref(db, 'players'), snap => {
       const now = Date.now();
       const seen = new Set();
@@ -506,14 +519,16 @@ function joinGame(){
         } else {
           rm.tx = d.x || 0; rm.tz = d.z || 0; rm.ty = d.y || 0; rm.try_ = d.ry || 0; rm.ts = d.ts; rm.vu = d.vu; rm.d = d;
           if (rm.g && d.anim && rm.curA !== d.anim && rm.acts[d.anim]) rPlay(rm, d.anim);
+          syncRemoteCar(rm, d.car || null);
         }
       });
       for (const [id, rm] of remotes){
         const d = snap.child(id).val();
         if (!seen.has(id) || (d && now - (d.ts || 0) > 20000)){
           if (rm.g) scene.remove(rm.g);
+          if (rm.carMesh) scene.remove(rm.carMesh);
           remotes.delete(id);
-        }
+        } else if (d && (d.car || null) !== (rm.carLabel || null)) syncRemoteCar(rm, d.car || null);
       }
       scoreTx.textContent = 'online: ' + (remotes.size + 1);
     });
@@ -532,6 +547,7 @@ async function loadRemote(rm, d){
     const b2 = new THREE.Box3().setFromObject(wrap); o.position.y -= b2.min.y;
     o.traverse(n => { if (n.isMesh){ n.castShadow = true; n.frustumCulled = false; } });
     wrap.position.set(rm.tx, 0, rm.tz);
+    wrap.visible = !rm.carLabel;
     const tag = nameSprite(d.name || '?');
     tag.position.y = 2.3;
     wrap.add(tag);
@@ -542,6 +558,40 @@ async function loadRemote(rm, d){
     if (rm.acts[d.anim || 'Idle']) rPlay(rm, d.anim || 'Idle');
   } catch(e){ console.error('remote load failed', e); remotes.delete(rm.id); }
 }
+const carTplCache = new Map();
+async function remoteCarMesh(rm, label){
+  try {
+    let tp = carTplCache.get(label);
+    if (!tp){
+      const g = await new Promise((res, rej) => loader.load('CITY/' + encodeURIComponent(label), res, undefined, rej));
+      const o = g.scene;
+      o.updateMatrixWorld(true);
+      const size = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3());
+      o.scale.multiplyScalar(4.5 / Math.max(size.x, size.y, size.z, 0.01));
+      o.updateMatrixWorld(true);
+      const box = new THREE.Box3().setFromObject(o);
+      tp = {o, minY:box.min.y};
+      carTplCache.set(label, tp);
+    }
+    const c = tp.o.clone();
+    c.position.y = -tp.minY;
+    scene.add(c);
+    return c;
+  } catch(e){ return null; }
+}
+async function syncRemoteCar(rm, label){
+  if (rm.carLabel === (label || null)) return;
+  rm.carLabel = label || null;
+  if (rm.carMesh){ scene.remove(rm.carMesh); rm.carMesh = null; }
+  if (label){
+    rm.carMesh = await remoteCarMesh(rm, label);
+    if (rm.g && rm.carMesh && remotes.has(rm.id)){
+      rm.carMesh.position.set(rm.g.position.x, 0.02, rm.g.position.z);
+      rm.carMesh.rotation.y = rm.g.rotation.y;
+      rm.g.visible = false;
+    } else if (rm.carMesh){ scene.remove(rm.carMesh); rm.carMesh = null; }
+  } else if (rm.g) rm.g.visible = true;
+}
 function rPlay(rm, n){
   const a = rm.acts[n]; if (!a || rm.curA === a) return;
   a.reset().fadeIn(0.25).play(); if (rm.curA) rm.curA.fadeOut(0.25); rm.curA = a;
@@ -551,7 +601,7 @@ function sendTick(){
   const now = performance.now();
   if (now - lastSend < 120) return;
   lastSend = now;
-  set(ref(db, 'players/' + myId), {name:myName, char:CHARS[idx], x:+cur.position.x.toFixed(2), y:+cur.position.y.toFixed(2), z:+cur.position.z.toFixed(2), ry:+cur.rotation.y.toFixed(2), anim:myAnim(), vu:myUid, ts:Date.now()});
+  set(ref(db, 'players/' + myId), {name:myName, char:CHARS[idx], x:+cur.position.x.toFixed(2), y:+cur.position.y.toFixed(2), z:+cur.position.z.toFixed(2), ry:+cur.rotation.y.toFixed(2), anim:myAnim(), vu:myUid, car:(driving && driveCar) ? driveCar.label : null, ts:Date.now()});
 }
 function remotesTick(dt){
   for (const rm of remotes.values()){
@@ -559,6 +609,7 @@ function remotesTick(dt){
     rm.g.position.x += (rm.tx - rm.g.position.x)*Math.min(1, dt*10);
     rm.g.position.z += (rm.tz - rm.g.position.z)*Math.min(1, dt*10);
     rm.g.position.y += ((rm.ty || 0) - rm.g.position.y)*Math.min(1, dt*12);
+    if (rm.carMesh){ rm.carMesh.position.x = rm.g.position.x; rm.carMesh.position.z = rm.g.position.z; rm.carMesh.rotation.y = rm.g.rotation.y; }
     let dd = (rm.try_ || 0) - rm.g.rotation.y;
     dd = Math.atan2(Math.sin(dd), Math.cos(dd));
     rm.g.rotation.y += dd*Math.min(1, dt*10);
@@ -739,6 +790,11 @@ function menuHome(){
 }
 function stopLobby(){ if (lobbyTimer){ clearInterval(lobbyTimer); lobbyTimer = null; } }
 document.getElementById('btnPlay').onclick = () => {
+  try {
+    const de = document.documentElement;
+    if (!document.fullscreenElement && de.requestFullscreen) de.requestFullscreen().catch(()=>{});
+    if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(()=>{});
+  } catch(e){}
   menuBtns.forEach(b => b.style.display = 'none');
   lobbyEl.style.display = 'block';
   let n = 5;
@@ -829,6 +885,13 @@ function toggleCar(){
     for (let i = driveables.length-1; i >= 0; i--) if (driveables[i] === d) driveables.splice(i,1);
     scene.attach(d.g);
     d.cr = oc ? oc.r : 2;
+    d.wheels = {spin:[], steer:[]};
+    d.g.traverse(n => {
+      if (n.isMesh && /wheel/i.test(n.name)){
+        d.wheels.spin.push(n);
+        if (/front/i.test(n.name)) d.wheels.steer.push(n);
+      }
+    });
     driving = true; driveCar = d; driveSpeed = 0;
     cur.visible = false;
     dist = 9;
@@ -849,8 +912,8 @@ function driveTick(dt, f, r){
   if (Math.abs(driveSpeed) > 0.3){
     driveCar.g.rotation.y -= steer * 1.7 * dt * Math.sign(driveSpeed) * Math.min(1, Math.abs(driveSpeed)/6 + 0.3);
   }
-  cp.x += -Math.sin(driveCar.g.rotation.y) * driveSpeed * dt;
-  cp.z += -Math.cos(driveCar.g.rotation.y) * driveSpeed * dt;
+  cp.x += Math.sin(driveCar.g.rotation.y) * driveSpeed * dt;
+  cp.z += Math.cos(driveCar.g.rotation.y) * driveSpeed * dt;
   const myColl = driveCar.g.userData.coll;
   for (const c of colliders){
     if (c === myColl) continue;
@@ -860,6 +923,13 @@ function driveTick(dt, f, r){
   if (myColl){ myColl.x = cp.x; myColl.z = cp.z; }
   cur.position.set(cp.x, 0, cp.z); // player rides along (hidden)
   cur.rotation.y = driveCar.g.rotation.y;
+  // wheels: spin + front steer
+  if (driveCar.wheels){
+    const spin = driveSpeed / 0.35 * dt;
+    for (const w of driveCar.wheels.spin) w.rotation.x += spin;
+    const sa = (steer || 0) * 0.45;
+    for (const w of driveCar.wheels.steer) w.rotation.y = sa;
+  }
   yaw = -driveCar.g.rotation.y + Math.PI;
   carPrompt.textContent = 'F — get out (' + Math.abs(Math.round(driveSpeed*3.6)) + ' km/h)';
   carPrompt.style.display = 'block';
@@ -1078,6 +1148,7 @@ function tick(){
 }
 camera.position.set(0,1.4,4.2);
 tick();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 function setProg(pct, msg){
   document.getElementById('lfill').style.width = Math.min(100, pct) + '%';
   if (msg) document.getElementById('lstatus').textContent = msg;
