@@ -461,12 +461,12 @@ const CITY_BLDG = [
   {files:['RB Blank.glb'], h:12, n:20, c:6, shadow:true},
 ];
 const CITY_CARS = [
-  {files:['Car.glb','Car-unqqkULtRU.glb','SUV.glb','Van.glb'], h:1.6, n:3, c:2.2, drive:true},
+  {files:['Car.glb','Car-unqqkULtRU.glb','SUV.glb','Van.glb'], h:1.6, n:2, c:2.2, drive:true},
   {files:['Sports Car.glb','Sports Car-Gzj704DXdr.glb'], h:1.4, n:1, c:2.2, drive:true},
   {files:['Bus.glb'], h:3, n:1, c:4, drive:true},
   {files:['Pickup Truck.glb'], h:2, n:1, c:2.4, drive:true},
   {files:['Police Car.glb'], h:1.6, n:1, c:2.2, drive:true},
-  {files:['Motorcycle.glb','Bicycle.glb'], h:1.2, n:2},
+  {files:['Motorcycle.glb','Bicycle.glb'], h:1.2, n:1},
 ];
 const driveables = [];
 function loadTreeFile(f){
@@ -501,6 +501,18 @@ async function loadTemplates(onStep){
   }
   for (const t of CITY_CARS) tplCars.push({t, models:byEntry.get(t) || []});
   for (const t of CITY_BLDG) tplBldg.push({t, models:byEntry.get(t) || []});
+  // center wheel pivots once at load (geometry is shared by all clones!)
+  for (const e of tplCars) for (const tp of e.models) tp.o.traverse(n => {
+    if (n.isMesh && /wheel/i.test(n.name) && n.geometry && !n.geometry.userData.pivoted){
+      n.geometry.computeBoundingBox();
+      const c0 = n.geometry.boundingBox.getCenter(new THREE.Vector3());
+      if (c0.length() > 0.01){
+        n.geometry.translate(-c0.x, -c0.y, -c0.z);
+        n.position.add(c0);
+      }
+      n.geometry.userData.pivoted = true;
+    }
+  });
 }
 // real textured buildings along rp roads (with proper road clearance)
 function spawnCityBuildings(){
@@ -534,7 +546,7 @@ function spawnParkedCars(){
   for (const entry of tplCars){
     const t = entry.t, models = entry.models;
     if (!models.length) continue;
-    for (let i = 0, tries = 0; i < t.n*8 && tries < t.n*8*12; tries++){
+    for (let i = 0, tries = 0; i < t.n*3 && tries < t.n*3*12; tries++){
       const si = Math.floor(rnd()*SEG.length);
       const [a,b] = SEG[si];
       const tt = rnd();
@@ -610,7 +622,7 @@ function makeChunk(ccx, ccz){
   for (const entry of tplCars){
     const t = entry.t, models = entry.models;
     if (!models.length) continue;
-    for (let i = 0, tries = 0; i < 4 && tries < 40; tries++){
+    for (let i = 0, tries = 0; i < 2 && tries < 24; tries++){
       const alongX = rnd() < 0.5;
       const a = (rnd()-0.5)*CHUNK*0.85;
       const lane = rnd() < 0.5 ? -2.6 : 2.6;
@@ -1121,9 +1133,18 @@ function toggleCar(){
     d.g.userData.driveEntry = d;
     scene.attach(d.g);
     d.cr = oc ? oc.r : 2;
+    // center wheel pivots so spin/steer rotates in place
+    d.wheels = {spin:[], steer:[]};
+    d.g.traverse(n => {
+      if (n.isMesh && /wheel/i.test(n.name)){
+        d.wheels.spin.push(n);
+        if (/front/i.test(n.name)) d.wheels.steer.push(n);
+      }
+    });
     if (d.fly){ startFly(d); return; }
     driving = true; driveCar = d; driveSpeed = 0;
     cur.visible = true; // driver stays visible in car
+    yaw = -d.g.rotation.y + Math.PI; // start behind car, then free look
     dist = 9;
     play('Idle');
     touchUI(true);
@@ -1153,7 +1174,14 @@ function driveTick(dt, f, r){
   if (myColl){ myColl.x = cp.x; myColl.z = cp.z; }
   cur.position.set(cp.x, 0, cp.z); // player rides along (visible driver)
   cur.rotation.y = driveCar.g.rotation.y;
-  yaw = -driveCar.g.rotation.y + Math.PI;
+  // wheels spin + front steer
+  if (driveCar.wheels){
+    const spin = driveSpeed / 0.35 * dt;
+    for (const w of driveCar.wheels.spin) w.rotation.x += spin;
+    const sa = THREE.MathUtils.clamp(steer * 0.45, -0.5, 0.5);
+    for (const w of driveCar.wheels.steer) w.rotation.y = sa;
+  }
+  // free camera: user can rotate to look at the car
   carPrompt.textContent = 'F — get out (' + Math.abs(Math.round(driveSpeed*3.6)) + ' km/h)';
   carPrompt.style.display = 'block';
 }
