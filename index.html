@@ -208,8 +208,8 @@ Object.assign(sun.shadow.camera,{left:-30,right:30,top:30,bottom:-30,near:1,far:
 scene.add(sun, sun.target);
 
 // ---------- Rangpur map (from rp) ----------
-const HALF = 260;
-scene.fog.near = 60; scene.fog.far = 260;
+const HALF = 470; // map scaled up: landmarks far apart
+scene.fog.near = 80; scene.fog.far = 340;
 const cv = document.createElement('canvas'); cv.width = cv.height = 256;
 const cx = cv.getContext('2d');
 cx.fillStyle = '#5f9f46'; cx.fillRect(0,0,256,256);
@@ -303,10 +303,13 @@ const LM = [
  {id:'ghagat',   name:'Ghaghat Park',            x:-132,z:-60,  r:14, h:9,  fn:park},
  {id:'vinno',    name:'Vinno Jogot Park',        x:185, z:170,  r:26, h:30, fn:vinno},
 ];
+// spread landmarks far apart (1.8x)
+LM.forEach(l => { l.x *= 1.8; l.z *= 1.8; l.r *= 1.5; });
+SPAWN.x *= 1.8; SPAWN.z *= 1.8;
 function placeLabel(text, y){ const c = document.createElement('canvas'); c.width = 512; c.height = 96; const x = c.getContext('2d'); x.fillStyle = '#000b'; x.beginPath(); if(x.roundRect) x.roundRect(4,8,504,80,22); else x.rect(4,8,504,80); x.fill();
   x.fillStyle = '#fff'; x.font = 'bold 42px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text.slice(0,24),256,50);
   const s = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthWrite:false})); s.scale.set(16,3,1); s.position.y = y; return s; }
-LM.forEach(l => { const g = new THREE.Group(); l.fn(g); g.position.set(l.x,0,l.z); scene.add(g); const s = placeLabel(l.name, l.h+3); g.add(s); l.label = s; colliders.push({x:l.x,z:l.z,r:l.r*.55}); });
+LM.forEach(l => { const g = new THREE.Group(); l.fn(g); g.position.set(l.x,0,l.z); scene.add(g); const s = placeLabel(l.name, l.h+3); g.add(s); l.label = s; colliders.push({x:l.x,z:l.z,r:l.r*.7}); });
 
 // ---------- roads & river ----------
 const ROADS = [
@@ -322,6 +325,8 @@ const SEG = []; ROADS.forEach(pl => { for(let i=0;i<pl.length-1;i++){ const [a,b
   const m = new THREE.Mesh(new THREE.PlaneGeometry(7,len+3).rotateX(-Math.PI/2), roadMat2); m.position.set((a[0]+b[0])/2,.03,(a[1]+b[1])/2); m.rotation.y = Math.atan2(dx,dz); m.receiveShadow = true; scene.add(m);
   const dot = new THREE.Mesh(new THREE.PlaneGeometry(.3,len).rotateX(-Math.PI/2), M(0xe8e0a0)); dot.position.set(m.position.x,.05,m.position.z); dot.rotation.y = m.rotation.y; scene.add(dot); }});
 const RIVER = [[-262,-230],[-175,-150],[-150,-60],[-172,20],[-150,100],[-190,200],[-232,262]];
+ROADS.forEach(pl => pl.forEach(p => { p[0] *= 1.8; p[1] *= 1.8; }));
+RIVER.forEach(p => { p[0] *= 1.8; p[1] *= 1.8; });
 const waterMat = new THREE.MeshLambertMaterial({color:0x2f8fd0});
 const RSEG = []; for(let i=0;i<RIVER.length-1;i++){ const [a,b] = [RIVER[i],RIVER[i+1]]; RSEG.push([a,b]); const dx=b[0]-a[0], dz=b[1]-a[1], len=Math.hypot(dx,dz);
   const m = new THREE.Mesh(new THREE.PlaneGeometry(16,len+8).rotateX(-Math.PI/2), waterMat); m.position.set((a[0]+b[0])/2,.04,(a[1]+b[1])/2); m.rotation.y = Math.atan2(dx,dz); scene.add(m); }
@@ -430,12 +435,13 @@ function spawnCityBuildings(){
     const t = entry.t, models = entry.models;
     if (!models.length) continue;
     for (let i = 0, tries = 0; i < t.n && tries < t.n*25; tries++){
-      const x = (rnd()-.5)*340, z = -140 + rnd()*340;
+      const x = (rnd()-.5)*620, z = -260 + rnd()*620;
       const v = 0.9 + rnd()*0.4;
       const tp = models[Math.floor(rnd()*models.length)];
       const need = 5 + (tp.fp*v)*0.62;
       const dr = dRoad(x,z);
-      if (dr < need || dr > 26 || dRiver(x,z) < 16 || nearLM(x,z,8) || Math.abs(x) > HALF-20) continue;
+      if (dr < need || dr > 30 || dRiver(x,z) < 16 || nearLM(x,z,8) || Math.abs(x) > HALF-20) continue;
+      if (Math.hypot(x-SPAWN.x, z-SPAWN.z) < 12) continue;
       const cr = (t.c || 6)*v;
       if (!free(x,z,cr)) continue;
       if (colliders.some(cc => Math.hypot(cc.x-x,cc.z-z) < cc.r + tp.fp*v*0.62 + 1)) continue;
@@ -475,6 +481,96 @@ function spawnParkedCars(){
       if (t.drive) driveables.push({g:c, chunk:'static', label:t.files[0]});
       i++;
     }
+  }
+}
+const chunks = new Map();
+const CHUNK = 90, RANGE = 1;
+const gt2 = new THREE.CanvasTexture(cv); gt2.wrapS = gt2.wrapT = THREE.RepeatWrapping; gt2.repeat.set(22, 22); gt2.colorSpace = THREE.SRGBColorSpace;
+const outGroundGeo = new THREE.PlaneGeometry(CHUNK, CHUNK);
+const outGroundMat = new THREE.MeshLambertMaterial({map:gt2});
+const outRoadMat = new THREE.MeshLambertMaterial({color:0x33373d});
+const outRoadGeoX = new THREE.PlaneGeometry(CHUNK, 8);
+const outRoadGeoZ = new THREE.PlaneGeometry(8, CHUNK);
+function makeChunk(ccx, ccz){
+  const key = ccx + ',' + ccz;
+  const g = new THREE.Group();
+  const x0 = ccx*CHUNK, z0 = ccz*CHUNK;
+  const coll = [];
+  if (Math.abs(x0) < HALF+CHUNK && Math.abs(z0) < HALF+CHUNK){ chunks.set(key, g); return; } // core rp map covers
+  const ground = new THREE.Mesh(outGroundGeo, outGroundMat);
+  ground.rotation.x = -Math.PI/2; ground.position.set(x0, 0, z0); ground.receiveShadow = true; g.add(ground);
+  const rx = new THREE.Mesh(outRoadGeoX, outRoadMat);
+  rx.rotation.x = -Math.PI/2; rx.position.set(x0, 0.02, z0); rx.receiveShadow = true; g.add(rx);
+  const rz = new THREE.Mesh(outRoadGeoZ, outRoadMat);
+  rz.rotation.x = -Math.PI/2; rz.position.set(x0, 0.02, z0); rz.receiveShadow = true; g.add(rz);
+  const put = (tp, x, z, v, ry, cr) => {
+    const c = tp.o.clone();
+    c.position.set(x, -tp.minY*v, z); c.rotation.y = ry; c.scale.multiplyScalar(v);
+    g.add(c);
+    if (cr){ const o2 = {x, z, r:cr}; o2.obj = c; c.userData.coll = o2; colliders.push(o2); coll.push(o2); }
+    return c;
+  };
+  const onRoad = (x, z) => Math.abs(x - x0) < 6 || Math.abs(z - z0) < 6;
+  // buildings: strict road clearance by footprint
+  for (const entry of tplBldg){
+    const t = entry.t, models = entry.models;
+    if (!models.length) continue;
+    for (let i = 0, tries = 0; i < 5 && tries < 60; tries++){
+      const x = x0 + (rnd()-0.5)*CHUNK*0.85, z = z0 + (rnd()-0.5)*CHUNK*0.85;
+      if (onRoad(x, z)) continue;
+      const v = 0.9 + rnd()*0.4;
+      const tp = models[Math.floor(rnd()*models.length)];
+      const need = 5 + tp.fp*v*0.62;
+      const dxr = Math.min(Math.abs(x-x0), Math.abs(z-z0));
+      if (dxr < need) continue;
+      const cr = Math.max((t.c||6)*v, tp.fp*v*0.55);
+      if (!free(x,z,cr)) continue;
+      if (colliders.some(cc => Math.hypot(cc.x-x,cc.z-z) < cc.r + tp.fp*v*0.62 + 1)) continue;
+      put(tp, x, z, v, Math.floor(rnd()*4)*Math.PI/2, cr);
+      i++;
+    }
+  }
+  // parked drivable cars on road edges
+  for (const entry of tplCars){
+    const t = entry.t, models = entry.models;
+    if (!models.length) continue;
+    for (let i = 0, tries = 0; i < 4 && tries < 40; tries++){
+      const alongX = rnd() < 0.5;
+      const a = (rnd()-0.5)*CHUNK*0.85;
+      const lane = rnd() < 0.5 ? -2.6 : 2.6;
+      const x = alongX ? x0 + a : x0 + lane;
+      const z = alongX ? z0 + lane : z0 + a;
+      const v = 0.95 + rnd()*0.2, cr = (t.c || 2)*v;
+      if (!free(x,z,cr)) continue;
+      const tp = models[Math.floor(rnd()*models.length)];
+      const cc = put(tp, x, z, v, alongX ? (lane > 0 ? Math.PI/2 : -Math.PI/2) : (lane > 0 ? 0 : Math.PI), cr);
+      if (t.drive) driveables.push({g:cc, chunk:key, label:t.files[0]});
+      i++;
+    }
+  }
+  g.userData.coll = coll;
+  scene.add(g);
+  chunks.set(key, g);
+}
+function dropChunk(key){
+  const g = chunks.get(key); if (!g) return;
+  scene.remove(g);
+  for (const c of g.userData.coll || []){ const i = colliders.indexOf(c); if (i >= 0) colliders.splice(i,1); }
+  for (let i = driveables.length-1; i >= 0; i--) if (driveables[i].chunk === key) driveables.splice(i,1);
+  chunks.delete(key);
+}
+let lastCX = 1e9, lastCZ = 1e9;
+function ensureGrid(px, pz){
+  const pcx = Math.floor(px/CHUNK+0.5), pcz = Math.floor(pz/CHUNK+0.5);
+  if (pcx === lastCX && pcz === lastCZ) return;
+  lastCX = pcx; lastCZ = pcz;
+  for (let dx = -RANGE; dx <= RANGE; dx++) for (let dz = -RANGE; dz <= RANGE; dz++){
+    const key = (pcx+dx) + ',' + (pcz+dz);
+    if (!chunks.has(key)) makeChunk(pcx+dx, pcz+dz);
+  }
+  for (const key of [...chunks.keys()]){
+    const parts = key.split(',');
+    if (Math.abs(+parts[0]-pcx) > RANGE || Math.abs(+parts[1]-pcz) > RANGE) dropChunk(key);
   }
 }
 // clouds
@@ -975,8 +1071,6 @@ function driveTick(dt, f, r){
     if (dd < min && dd > 0.01){ cp.x = c.x + ox/dd*min; cp.z = c.z + oz/dd*min; driveSpeed *= 0.4; }
   }
   if (myColl){ myColl.x = cp.x; myColl.z = cp.z; }
-  cp.x = Math.max(-HALF+4, Math.min(HALF-4, cp.x));
-  cp.z = Math.max(-HALF+4, Math.min(HALF-4, cp.z));
   cur.position.set(cp.x, 0, cp.z); // player rides along (visible driver)
   cur.rotation.y = driveCar.g.rotation.y;
   yaw = -driveCar.g.rotation.y + Math.PI;
@@ -1146,11 +1240,10 @@ function tick(){
         const ox = cur.position.x - c.x, oz = cur.position.z - c.z, dd = Math.hypot(ox,oz), min = c.r + .4;
         if (dd < min && dd > 0){ cur.position.x = c.x + ox/dd*min; cur.position.z = c.z + oz/dd*min; }
       }
-      cur.position.x = Math.max(-HALF+4, Math.min(HALF-4, cur.position.x));
-      cur.position.z = Math.max(-HALF+4, Math.min(HALF-4, cur.position.z));
       } // end walk mode
       const focus = (driving && driveCar) ? driveCar.g.position : cur.position;
       look.set(focus.x, 1.5 + ((driving && driveCar) ? 1 : 0), focus.z);
+      ensureGrid(focus.x, focus.z);
       placeTick(dt);
       if (mode === 'play') drawMini();
       if (!driving && mode === 'play' && nearestCar()){
@@ -1216,7 +1309,7 @@ Promise.all([
       setProg(65 + 35*(i+1)/CHARS.length, 'Loading characters... ' + (i+1) + '/' + CHARS.length);
     }
   })()
-]).then(() => { spawnParkedCars(); spawnCityBuildings(); applyGfx(); setProg(100, 'Ready!'); setTimeout(() => {
+]).then(() => { spawnParkedCars(); spawnCityBuildings(); ensureGrid(SPAWN.x, SPAWN.z); applyGfx(); setProg(100, 'Ready!'); setTimeout(() => {
   load.remove();
   if (savedName){
     document.getElementById('pname').value = savedName;
