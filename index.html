@@ -54,6 +54,8 @@
   #btnGas{right:18px;bottom:190px}
   #btnBrake{right:18px;bottom:100px}
   #btnGear{right:112px;bottom:100px}
+  #btnUp{right:18px;bottom:280px}
+  #btnDown{right:112px;bottom:190px}
   #hud{position:fixed;left:12px;top:12px;font-size:14px;line-height:1.6;background:#0006;padding:8px 12px;border-radius:10px;display:none}
   #score{position:fixed;right:12px;top:12px;font-size:18px;font-weight:700;background:#0008;padding:10px 16px;border-radius:12px;display:none;z-index:5;align-items:center;gap:8px}
   #score .dot{width:12px;height:12px;border-radius:50%;background:#37d67a;box-shadow:0 0 8px #37d67a}
@@ -106,6 +108,8 @@
   <button class="cbtn" id="btnGas">▲</button>
   <button class="cbtn" id="btnBrake">▼</button>
   <button class="cbtn" id="btnGear">D</button>
+  <button class="cbtn" id="btnUp">▲▲</button>
+  <button class="cbtn" id="btnDown">▼▼</button>
 </div>
 <div id="carPrompt"></div>
 <div id="score"><span class="dot"></span><span id="scoreTx">online: 1</span></div>
@@ -328,9 +332,51 @@ SPAWN.x *= 1.8; SPAWN.z *= 1.8;
 // far beach ~10 min walk from spawn
 LM.push({id:'beach', name:"Cox's Bazar Sea Beach", x:1500, z:-1700, r:45, h:8, fn:beach});
 const BEACH = {x:1500, z:-1700};
-{
-  const bg = new THREE.Mesh(new THREE.PlaneGeometry(320, 320).rotateX(-Math.PI/2), new THREE.MeshLambertMaterial({color:0x9aa06b}));
-  bg.position.set(BEACH.x, 0.015, BEACH.z); bg.receiveShadow = true; scene.add(bg);
+// ---------- airport ----------
+const AIRPORT = {x:420, z:-480};
+let jetTpl = null;
+async function loadJet(){
+  try {
+    const g = await loadTreeFile(encodeURIComponent('Jet by Poly by Google - bgUY8zN2Bq9.glb'));
+    const o = g.scene;
+    o.updateMatrixWorld(true);
+    const size = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3());
+    o.scale.multiplyScalar(12 / Math.max(size.x, size.y, size.z, 0.01));
+    o.updateMatrixWorld(true);
+    jetTpl = {o, minY:new THREE.Box3().setFromObject(o).min.y};
+  } catch(e){ console.error('jet failed', e); }
+}
+function buildAirport(){
+  // runway 220x14 along X + markings
+  const rw = new THREE.Mesh(new THREE.PlaneGeometry(220, 14).rotateX(-Math.PI/2), new THREE.MeshLambertMaterial({color:0x2f3338}));
+  rw.position.set(AIRPORT.x, 0.03, AIRPORT.z); rw.receiveShadow = true; scene.add(rw);
+  for (let k = -5; k <= 5; k++){
+    const dash = new THREE.Mesh(new THREE.PlaneGeometry(4, 0.5).rotateX(-Math.PI/2), new THREE.MeshLambertMaterial({color:0xf5f5f5}));
+    dash.position.set(AIRPORT.x + k*18, 0.05, AIRPORT.z); scene.add(dash);
+  }
+  // terminal (Big Building template) + label
+  const tb = tplBldg.length && tplBldg[0].models[0];
+  if (tb){
+    const t = tb.o.clone();
+    t.position.set(AIRPORT.x - 20, -tb.minY, AIRPORT.z + 28);
+    t.rotation.y = Math.PI/2;
+    scene.add(t);
+    colliders.push({x:AIRPORT.x - 20, z:AIRPORT.z + 28, r:10});
+    const s = placeLabel('Rangpur Airport', 26);
+    s.position.set(AIRPORT.x - 20, 0, AIRPORT.z + 28); scene.add(s);
+  }
+  // 2 parked flyable jets
+  if (jetTpl){
+    [[-30, 12, 0.2],[ -38, -10, -0.15]].forEach(([dx, dz, ry]) => {
+      const c = jetTpl.o.clone();
+      c.position.set(AIRPORT.x + dx, -jetTpl.minY, AIRPORT.z + dz);
+      c.rotation.y = ry;
+      scene.add(c);
+      const o2 = {x:AIRPORT.x + dx, z:AIRPORT.z + dz, r:3.2};
+      o2.obj = c; c.userData.coll = o2; colliders.push(o2);
+      driveables.push({g:c, chunk:'static', label:encodeURIComponent('Jet by Poly by Google - bgUY8zN2Bq9.glb'), fly:true});
+    });
+  }
 }
 function placeLabel(text, y){ const c = document.createElement('canvas'); c.width = 512; c.height = 96; const x = c.getContext('2d'); x.fillStyle = '#000b'; x.beginPath(); if(x.roundRect) x.roundRect(4,8,504,80,22); else x.rect(4,8,504,80); x.fill();
   x.fillStyle = '#fff'; x.font = 'bold 42px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text.slice(0,24),256,50);
@@ -364,6 +410,7 @@ const nearLM = (x,z,pad) => LM.some(l => Math.hypot(l.x-x,l.z-z) < l.r+pad);
 // ---------- city trees ----------
 const mm = new THREE.Matrix4();
 const T = []; for(let i=0;i<6000 && T.length<380;i++){ const x=(rnd()-.5)*HALF*1.95, z=(rnd()-.5)*HALF*1.95;
+  if (Math.abs(x-AIRPORT.x) < 140 && Math.abs(z-AIRPORT.z) < 60) continue;
   if(dRoad(x,z)<7 || dRiver(x,z)<12 || nearLM(x,z,4) || Math.hypot(x-SPAWN.x,z-SPAWN.z)<8 || colliders.some(c => Math.hypot(c.x-x,c.z-z) < c.r+2)) continue; T.push([x,z,.8+rnd()*.9]); colliders.push({x,z,r:.5}); }
 const tr = new THREE.InstancedMesh(new THREE.CylinderGeometry(.25,.35,2,6), M(0x6b4423), T.length), lf = new THREE.InstancedMesh(new THREE.ConeGeometry(1.6,4.5,7), M(0x2f7d3a), T.length);
 T.forEach(([x,z,s],i) => { tr.setMatrixAt(i, mm.makeScale(s,s,s).setPosition(x,s,z)); lf.setMatrixAt(i, mm.makeScale(s,s,s).setPosition(x,s*4,z)); });
@@ -467,6 +514,7 @@ function spawnCityBuildings(){
       const need = 5 + (tp.fp*v)*0.62;
       const dr = dRoad(x,z);
       if (dr < need || dr > 30 || dRiver(x,z) < 16 || nearLM(x,z,8) || Math.abs(x) > HALF-20) continue;
+      if (Math.abs(x-AIRPORT.x) < 140 && Math.abs(z-AIRPORT.z) < 60) continue; // airport clear
       if (Math.hypot(x-SPAWN.x, z-SPAWN.z) < 12) continue;
       const cr = (t.c || 6)*v;
       if (!free(x,z,cr)) continue;
@@ -504,7 +552,7 @@ function spawnParkedCars(){
       c.scale.multiplyScalar(v);
       scene.add(c);
       const o2 = {x, z, r:cr}; o2.obj = c; c.userData.coll = o2; colliders.push(o2);
-      if (t.drive) driveables.push({g:c, chunk:'static', label:t.files[0]});
+      if (t.drive) driveables.push({g:c, chunk:'static', label:'CITY/'+encodeURIComponent(t.files[0])});
       i++;
     }
   }
@@ -523,6 +571,7 @@ function makeChunk(ccx, ccz){
   const x0 = ccx*CHUNK, z0 = ccz*CHUNK;
   const coll = [];
   if (Math.abs(x0) < HALF+CHUNK && Math.abs(z0) < HALF+CHUNK){ chunks.set(key, g); return; } // core rp map covers
+  if (Math.hypot(x0-AIRPORT.x, z0-AIRPORT.z) < 160) { chunks.set(key, g); return; } // airport clear
   const ground = new THREE.Mesh(outGroundGeo, outGroundMat);
   ground.rotation.x = -Math.PI/2; ground.position.set(x0, 0, z0); ground.receiveShadow = true; g.add(ground);
   const rx = new THREE.Mesh(outRoadGeoX, outRoadMat);
@@ -746,7 +795,7 @@ async function remoteCarMesh(rm, label){
   try {
     let tp = carTplCache.get(label);
     if (!tp){
-      const g = await new Promise((res, rej) => loader.load('CITY/' + encodeURIComponent(label), res, undefined, rej));
+      const g = await new Promise((res, rej) => loader.load(label, res, undefined, rej));
       const o = g.scene;
       o.updateMatrixWorld(true);
       const size = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3());
@@ -1023,6 +1072,7 @@ function enterPlay(){
   touchUI(true); toggleEmotes(false); play('Idle'); joinGame();
 }
 function toMenu(){
+  if (flying) exitFly();
   if (driving) toggleCar();
   carPrompt.style.display = 'none'; mode = 'select';
   selEl.style.display = 'none'; menuEl.style.display = 'flex';
@@ -1068,8 +1118,10 @@ function toggleCar(){
     const oc = d.g.userData.coll;
     if (oc){ const i = colliders.indexOf(oc); if (i >= 0) colliders.splice(i,1); }
     for (let i = driveables.length-1; i >= 0; i--) if (driveables[i] === d) driveables.splice(i,1);
+    d.g.userData.driveEntry = d;
     scene.attach(d.g);
     d.cr = oc ? oc.r : 2;
+    if (d.fly){ startFly(d); return; }
     driving = true; driveCar = d; driveSpeed = 0;
     cur.visible = true; // driver stays visible in car
     dist = 9;
@@ -1105,6 +1157,73 @@ function driveTick(dt, f, r){
   carPrompt.textContent = 'F — get out (' + Math.abs(Math.round(driveSpeed*3.6)) + ' km/h)';
   carPrompt.style.display = 'block';
 }
+// ---------- flying ----------
+let flying = false, flyMesh = null, flyThrottle = 0, flySpeed = 0, flyPitch = 0, flyVy = 0;
+const flyIn = {up:0, down:0};
+function startFly(d){
+  flying = true; flyMesh = d.g; driveCar = d;
+  flyThrottle = 0; flySpeed = 0; flyPitch = 0; flyVy = 0;
+  cur.visible = true;
+  dist = 14;
+  play('Idle');
+  touchUI(true);
+  carPrompt.textContent = 'W/S throttle · A/D turn · Space climb · Shift sink · F exit';
+  carPrompt.style.display = 'block';
+}
+function exitFly(){
+  if (!flying || !flyMesh) return;
+  const cp = flyMesh.position;
+  cur.position.set(cp.x + 3, 0, cp.z + 3);
+  const o2 = {x:cp.x, z:cp.z, r:3.2};
+  o2.obj = flyMesh; flyMesh.userData.coll = o2;
+  colliders.push(o2);
+  driveables.push(flyMesh.userData.driveEntry || {g:flyMesh, chunk:'static', label:encodeURIComponent('Jet by Poly by Google - bgUY8zN2Bq9.glb')});
+  flying = false; flyMesh = null; flySpeed = 0; flyPitch = 0;
+  driveCar = null;
+  dist = 6;
+  play('Idle');
+  touchUI(true);
+}
+function flyTick(dt, f, r){
+  const cp = flyMesh.position;
+  const upIn = (keys.Space ? 1 : 0) + (flyIn.up ? 1 : 0);
+  const dnIn = ((keys.ShiftLeft || keys.ShiftRight) ? 1 : 0) + (flyIn.down ? 1 : 0);
+  let thr = f;
+  if (carIn.gas) thr = 1;
+  if (carIn.brake) thr = -1;
+  flyThrottle = Math.max(0, Math.min(1, flyThrottle + thr*0.5*dt));
+  const target = flyThrottle*55;
+  flySpeed += Math.max(-20*dt, Math.min(20*dt, target - flySpeed));
+  const steer = r + (carIn.r - carIn.l);
+  flyMesh.rotation.y -= steer * 1.1 * dt * Math.min(1, Math.abs(flySpeed)/15 + 0.2);
+  const onGround = cp.y <= 0.15;
+  if (onGround && flySpeed < 14){
+    flyPitch = 0; // need takeoff speed
+  } else {
+    if (upIn) flyPitch = Math.min(0.55, flyPitch + 0.9*dt);
+    else if (dnIn) flyPitch = Math.max(-0.5, flyPitch - 0.9*dt);
+    else flyPitch *= (1 - Math.min(1, dt*0.8));
+  }
+  if (!onGround && flySpeed < 10) flyPitch = Math.min(flyPitch, -0.25); // stall
+  flyVy = Math.sin(flyPitch)*flySpeed*0.9;
+  if (onGround && flyVy < 0) flyVy = 0;
+  cp.x += Math.sin(flyMesh.rotation.y) * flySpeed * dt;
+  cp.z += Math.cos(flyMesh.rotation.y) * flySpeed * dt;
+  cp.y = Math.max(0, Math.min(150, cp.y + flyVy*dt));
+  flyMesh.rotation.x = -flyPitch*0.7;
+  flyMesh.rotation.z = THREE.MathUtils.clamp(steer*0.4, -0.5, 0.5);
+  for (const c of colliders){
+    if (c.obj === flyMesh) continue;
+    if (cp.y > 12) continue;
+    const ox = cp.x - c.x, oz = cp.z - c.z, dd = Math.hypot(ox,oz), min = c.r + 2;
+    if (dd < min && dd > 0.01){ cp.x = c.x + ox/dd*min; cp.z = c.z + oz/dd*min; flySpeed *= 0.6; }
+  }
+  cur.position.set(cp.x, cp.y, cp.z);
+  cur.rotation.y = flyMesh.rotation.y;
+  yaw = -flyMesh.rotation.y + Math.PI;
+  carPrompt.textContent = Math.round(flySpeed*3.6) + ' km/h · F exit';
+  carPrompt.style.display = 'block';
+}
 
 // ---------- input ----------
 const keys = {};
@@ -1120,9 +1239,9 @@ addEventListener('keydown', e => {
   if (mode === 'select'){ if(e.code==='ArrowLeft') cycle(-1); if(e.code==='ArrowRight') cycle(1);
   if (e.code==='Enter'){ if (selEl.style.display !== 'none') document.getElementById('tonext').click(); else if (menuEl.style.display !== 'none') document.getElementById('btnPlay').click(); } }
   else {
-    if (e.code==='KeyC'){ toMenu(); }
+    if (e.code==='KeyC'){ if (flying) exitFly(); if (driving) toggleCar(); toMenu(); }
     if (e.code==='KeyE') toggleEmotes();
-    if (e.code==='KeyF') toggleCar();
+    if (e.code==='KeyF'){ if (flying) exitFly(); else toggleCar(); }
     if (e.code==='KeyM') toggleMic();
     if (e.code==='Space') jumpBuf = 0.12;
     if (e.code==='Escape') toggleEmotes(false);
@@ -1156,10 +1275,18 @@ const btnCar = document.getElementById('btnCar');
 let joyId = null, joyOX = 0, joyOY = 0, camId = null, camLX = 0, camLY = 0;
 function touchUI(on){
   const d = on && IS_TOUCH ? 'block' : 'none';
-  const foot = (on && IS_TOUCH && !driving) ? 'block' : 'none';
+  const foot = (on && IS_TOUCH && !driving && !flying) ? 'block' : 'none';
   btnJump.style.display = foot; btnRun.style.display = foot; btnEmote.style.display = foot;
-  document.getElementById('carUI').style.display = (on && IS_TOUCH && driving) ? 'block' : 'none';
+  document.getElementById('carUI').style.display = (on && IS_TOUCH && (driving || flying)) ? 'block' : 'none';
   btnCar.style.display = d;
+  const up = document.getElementById('btnUp'), dn = document.getElementById('btnDown');
+  up.style.display = (on && IS_TOUCH && flying) ? 'flex' : 'none';
+  dn.style.display = (on && IS_TOUCH && flying) ? 'flex' : 'none';
+  document.getElementById('btnGas').style.display = (on && IS_TOUCH && (driving || flying)) ? 'flex' : 'none';
+  document.getElementById('btnBrake').style.display = (on && IS_TOUCH && (driving || flying)) ? 'flex' : 'none';
+  document.getElementById('btnGear').style.display = (on && IS_TOUCH && driving && !flying) ? 'flex' : 'none';
+  document.getElementById('btnSteerL').style.display = (on && IS_TOUCH && (driving || flying)) ? 'flex' : 'none';
+  document.getElementById('btnSteerR').style.display = (on && IS_TOUCH && (driving || flying)) ? 'flex' : 'none';
 }
 // car touch controls: steer arrows + gas + brake + gear
 const carIn = {l:0, r:0, gas:0, brake:0, gear:'D'};
@@ -1173,6 +1300,8 @@ holdBtn(document.getElementById('btnSteerL'), () => carIn.l = 1, () => carIn.l =
 holdBtn(document.getElementById('btnSteerR'), () => carIn.r = 1, () => carIn.r = 0);
 holdBtn(document.getElementById('btnGas'), () => carIn.gas = 1, () => carIn.gas = 0);
 holdBtn(document.getElementById('btnBrake'), () => carIn.brake = 1, () => carIn.brake = 0);
+holdBtn(document.getElementById('btnUp'), () => flyIn.up = 1, () => flyIn.up = 0);
+holdBtn(document.getElementById('btnDown'), () => flyIn.down = 1, () => flyIn.down = 0);
 document.getElementById('btnGear').addEventListener('touchstart', e => {
   e.stopPropagation();
   carIn.gear = carIn.gear === 'D' ? 'R' : 'D';
@@ -1238,7 +1367,8 @@ function tick(){
       if (mag > 1){ f /= mag; r /= mag; }
       const moving = mag > 0.15;
       const airborne = cur.position.y > 0.02 || vy !== 0;
-      if (driving && driveCar){ driveTick(dt, f, r); }
+      if (flying && flyMesh){ flyTick(dt, f, r); }
+      else if (driving && driveCar){ driveTick(dt, f, r); }
       else {
       if (moving){
         const run = keys.ShiftLeft || keys.ShiftRight || joy.run;
@@ -1269,15 +1399,15 @@ function tick(){
         if (dd < min && dd > 0){ cur.position.x = c.x + ox/dd*min; cur.position.z = c.z + oz/dd*min; }
       }
       } // end walk mode
-      const focus = (driving && driveCar) ? driveCar.g.position : cur.position;
-      look.set(focus.x, 1.5 + ((driving && driveCar) ? 1 : 0), focus.z);
-      ensureGrid(focus.x, focus.z);
+      const focus = (flying && flyMesh) ? flyMesh.position : ((driving && driveCar) ? driveCar.g.position : cur.position);
+      look.set(focus.x, 1.5 + ((driving && driveCar) ? 1 : 0) + ((flying && flyMesh) ? 2 : 0), focus.z);
       placeTick(dt);
       if (mode === 'play') drawMini();
-      if (!driving && mode === 'play' && nearestCar()){
-        carPrompt.textContent = 'F — drive';
-        carPrompt.style.display = 'block';
-      } else if (!driving) carPrompt.style.display = 'none';
+      if (!driving && !flying && mode === 'play'){
+        const nc = nearestCar();
+        if (nc){ carPrompt.textContent = nc.fly ? 'F — fly the jet!' : 'F — drive'; carPrompt.style.display = 'block'; }
+        else carPrompt.style.display = 'none';
+      } else if (!driving && !flying) carPrompt.style.display = 'none';
       camera.position.set(look.x + Math.sin(yaw)*Math.cos(pitch)*dist, look.y + Math.sin(pitch)*dist, look.z + Math.cos(yaw)*Math.cos(pitch)*dist);
     } else {
       yaw = 0;
@@ -1330,14 +1460,15 @@ function setProg(pct, msg){
 setProg(10, 'Building Rangpur...');
 Promise.all([
   show(0),
-  loadTemplates((d,n) => setProg(10 + 55*d/n, 'Loading cars... ' + d + '/' + n)),
+  loadTemplates((d,n) => setProg(10 + 50*d/n, 'Loading cars... ' + d + '/' + n)),
+  loadJet(),
   (async () => {
     for (let i = 0; i < CHARS.length; i++){
       try { await loadChar(CHARS[i]); } catch(e){}
       setProg(65 + 35*(i+1)/CHARS.length, 'Loading characters... ' + (i+1) + '/' + CHARS.length);
     }
   })()
-]).then(() => { spawnParkedCars(); spawnCityBuildings(); ensureGrid(SPAWN.x, SPAWN.z); applyGfx(); setProg(100, 'Ready!'); setTimeout(() => {
+]).then(() => { spawnParkedCars(); spawnCityBuildings(); buildAirport(); ensureGrid(SPAWN.x, SPAWN.z); applyGfx(); setProg(100, 'Ready!'); setTimeout(() => {
   load.remove();
   if (savedName){
     document.getElementById('pname').value = savedName;
