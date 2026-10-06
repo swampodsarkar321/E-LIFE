@@ -63,6 +63,9 @@
   #voice svg{width:22px;height:22px;fill:#fff}
   #mic svg{width:28px;height:28px;fill:#fff;display:block;margin:auto}
   #mini{position:fixed;right:12px;bottom:12px;width:150px;height:150px;border-radius:12px;border:2px solid #ffffff88;display:none;z-index:5}
+  #bigmap{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:#000c;z-index:40;flex-direction:column;gap:10px}
+  #bigc{width:min(92vw,78vh);height:min(92vw,78vh);border-radius:14px;border:2px solid #ffd21f}
+  #bigHint{font-size:15px;font-weight:700;text-shadow:0 2px 4px #000}
   #place{position:fixed;left:50%;top:64px;transform:translateX(-50%);font-size:clamp(18px,3vw,28px);font-weight:800;text-shadow:0 2px 8px #000;opacity:0;transition:opacity .4s;pointer-events:none;z-index:5}
   #emotes{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);display:none;gap:8px;flex-wrap:wrap;justify-content:center;max-width:90vw;z-index:5}
   #emotes button{padding:10px 14px;font-size:15px}
@@ -116,6 +119,7 @@
 <div id="voice"><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg><span>Someone nearby — talk!</span></div>
 <div id="mic" title="Mic"><svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.93V21h2v-3.07A7 7 0 0 0 19 11h-2z"/></svg></div>
 <canvas id="mini" width="300" height="300"></canvas>
+<div id="bigmap"><canvas id="bigc" width="640" height="640"></canvas><div id="bigHint">Click map to mark route · M / ✕ close</div><button id="bigClose" style="font-size:17px;padding:12px 30px">CLOSE</button></div>
 <div id="place"></div>
 <div id="emotes"></div>
 <div id="select">
@@ -417,6 +421,8 @@ T.forEach(([x,z,s],i) => { tr.setMatrixAt(i, mm.makeScale(s,s,s).setPosition(x,s
 tr.castShadow = lf.castShadow = true; scene.add(tr, lf);
 // ---------- minimap ----------
 const miniEl = document.getElementById('mini'), mmc = miniEl.getContext('2d'), MK = miniEl.width/(HALF*2);
+miniEl.style.cursor = 'pointer';
+miniEl.addEventListener('click', () => toggleBig(true));
 const miniBg = document.createElement('canvas'); miniBg.width = miniBg.height = miniEl.width;
 {
   const b = miniBg.getContext('2d');
@@ -444,6 +450,113 @@ function drawMini(){
   }
 }
 let curPlace = '', placeT = 0;
+// ---------- big map + GTA route ----------
+let mark = null, markMesh = null, bigOpen = false, bigT = 0;
+const bigmapEl = document.getElementById('bigmap');
+const bigc = document.getElementById('bigc');
+const bigx = bigc.getContext('2d');
+function setMark(x, z){
+  mark = {x:Math.max(-HALF, Math.min(HALF, x)), z:Math.max(-HALF, Math.min(HALF, z))};
+  if (!markMesh){
+    markMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.2, 1.2, 60, 12, 1, true),
+      new THREE.MeshBasicMaterial({color:0xffd21f, transparent:true, opacity:0.55, side:THREE.DoubleSide, depthWrite:false})
+    );
+    scene.add(markMesh);
+  }
+  markMesh.position.set(mark.x, 30, mark.z);
+  markMesh.visible = true;
+}
+function clearMark(){ mark = null; if (markMesh) markMesh.visible = false; }
+// A* on road segments
+function roadRoute(fx, fz, tx, tz){
+  const key = p => Math.round(p[0])+','+Math.round(p[1]);
+  const nodes = new Map(), adj = new Map();
+  const addN = p => { const k = key(p); if (!nodes.has(k)) nodes.set(k, p); return k; };
+  const link = (a, b) => {
+    const ka = addN(a), kb = addN(b);
+    const w = Math.hypot(a[0]-b[0], a[1]-b[1]);
+    if (!adj.has(ka)) adj.set(ka, []);
+    if (!adj.has(kb)) adj.set(kb, []);
+    adj.get(ka).push([kb, w]); adj.get(kb).push([ka, w]);
+  };
+  SEG.forEach(([a,b]) => link(a, b));
+  const proj = (px, pz) => {
+    let best = null, bd = 1e18;
+    SEG.forEach(([a,b]) => {
+      const dx = b[0]-a[0], dz = b[1]-a[1], L2 = dx*dx+dz*dz || 1;
+      const t = Math.max(0, Math.min(1, ((px-a[0])*dx + (pz-a[1])*dz)/L2));
+      const qx = a[0]+t*dx, qz = a[1]+t*dz, d = Math.hypot(px-qx, pz-qz);
+      if (d < bd) bd = d, best = [qx, qz];
+    });
+    return best;
+  };
+  const s = proj(fx, fz), e = proj(tx, tz);
+  const ks = addN(s), ke = addN(e);
+  link([fx, fz], s); link([tx, tz], e);
+  const open = [[0, ks]], came = new Map(), gs = new Map([[ks, 0]]);
+  const H = k => { const p = nodes.get(k); return Math.hypot(p[0]-e[0], p[1]-e[1]); };
+  const done = new Set();
+  while (open.length){
+    open.sort((a,b) => a[0]-b[0]);
+    const [, ck] = open.shift();
+    if (ck === ke){
+      const path = [nodes.get(ke)];
+      let c = ke;
+      while (came.has(c)){ c = came.get(c); path.push(nodes.get(c)); }
+      return path.reverse();
+    }
+    if (done.has(ck)) continue;
+    done.add(ck);
+    for (const [nk, w] of (adj.get(ck) || [])){
+      const ng = (gs.get(ck) ?? 1e18) + w;
+      if (ng < (gs.get(nk) ?? 1e18)){ gs.set(nk, ng); came.set(nk, ck); open.push([ng + H(nk), nk]); }
+    }
+  }
+  return [s, e];
+}
+function drawBig(){
+  const W = bigc.width, K = W/(HALF*2);
+  const P = (x,z) => [(x+HALF)*K, (z+HALF)*K];
+  bigx.drawImage(miniBg, 0, 0, W, W);
+  bigx.font = '20px sans-serif'; bigx.textAlign = 'center'; bigx.textBaseline = 'middle';
+  LM.forEach(l => { const [x,y] = P(l.x, l.z); bigx.fillText(l.ic || '•', x, y); });
+  if (mark && cur){
+    const route = roadRoute(cur.position.x, cur.position.z, mark.x, mark.z);
+    bigx.strokeStyle = '#ffd21f'; bigx.lineWidth = 5; bigx.setLineDash([12, 8]);
+    bigx.beginPath();
+    route.forEach((p, i) => { const [x,y] = P(p[0], p[1]); i ? bigx.lineTo(x,y) : bigx.moveTo(x,y); });
+    bigx.stroke(); bigx.setLineDash([]);
+    const [mx,my] = P(mark.x, mark.z);
+    bigx.font = '26px sans-serif'; bigx.fillText('📍', mx, my);
+    const dd = Math.round(Math.hypot(mark.x-cur.position.x, mark.z-cur.position.z));
+    bigx.fillStyle = '#fff'; bigx.font = 'bold 20px sans-serif';
+    bigx.fillText(dd + 'm', mx, my - 24);
+  }
+  if (cur){
+    const [px,py] = P(cur.position.x, cur.position.z);
+    bigx.fillStyle = '#fff'; bigx.strokeStyle = '#000'; bigx.lineWidth = 3;
+    bigx.beginPath(); bigx.arc(px,py,9,0,7); bigx.fill(); bigx.stroke();
+  }
+  bigx.fillStyle = '#ffd21f';
+  for (const rm of remotes.values()){
+    if (!rm.g) continue;
+    const [rx,ry] = P(rm.g.position.x, rm.g.position.z);
+    bigx.beginPath(); bigx.arc(rx,ry,6,0,7); bigx.fill();
+  }
+}
+function toggleBig(force){
+  bigOpen = force !== undefined ? force : !bigOpen;
+  bigmapEl.style.display = bigOpen ? 'flex' : 'none';
+  if (bigOpen) drawBig();
+}
+bigc.addEventListener('click', e => {
+  const r = bigc.getBoundingClientRect();
+  const K = bigc.width/(HALF*2);
+  setMark((e.clientX - r.left)/r.width*bigc.width/K - HALF, (e.clientY - r.top)/r.height*bigc.height/K - HALF);
+  drawBig();
+});
+document.getElementById('bigClose').onclick = () => toggleBig(false);
 function placeTick(dt){
   placeT -= dt;
   if (placeT > 0) return;
@@ -1274,10 +1387,11 @@ addEventListener('keydown', e => {
   else {
     if (e.code==='KeyC'){ if (flying) exitFly(); if (driving) toggleCar(); toMenu(); }
     if (e.code==='KeyE') toggleEmotes();
+    if (e.code==='KeyM'){ if (bigOpen) toggleBig(false); else toggleBig(true); }
     if (e.code==='KeyF'){ if (flying) exitFly(); else toggleCar(); }
-    if (e.code==='KeyM') toggleMic();
+    if (e.code==='KeyN') toggleMic();
     if (e.code==='Space') jumpBuf = 0.12;
-    if (e.code==='Escape') toggleEmotes(false);
+    if (e.code==='Escape'){ toggleEmotes(false); toggleBig(false); }
     if (e.code==='ControlLeft' || e.code==='ControlRight') setLock(!locked);
   }
   if (e.code==='ControlLeft' || e.code==='ControlRight') e.preventDefault();
@@ -1478,6 +1592,11 @@ function tick(){
     if (c.g.position.x-px < -180) c.g.position.x += 360;
     if (c.g.position.z-pz > 180) c.g.position.z -= 360;
     if (c.g.position.z-pz < -180) c.g.position.z += 360;
+  }
+  if (markMesh && markMesh.visible) markMesh.rotation.y += dt*1.2;
+  if (bigOpen){
+    bigT += dt;
+    if (bigT > 0.5){ bigT = 0; drawBig(); }
   }
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
