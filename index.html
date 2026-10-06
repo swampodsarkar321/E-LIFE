@@ -1314,6 +1314,7 @@ function startFly(d){
   flying = true; flyMesh = d.g; driveCar = d;
   flyThrottle = 0; flySpeed = 0; flyPitch = 0; flyVy = 0;
   cur.visible = true;
+  yaw = -d.g.rotation.y + Math.PI; // start behind jet, then free look
   dist = 14;
   play('Idle');
   touchUI(true);
@@ -1360,7 +1361,9 @@ function flyTick(dt, f, r){
   if (onGround && flyVy < 0) flyVy = 0;
   cp.x += Math.sin(flyMesh.rotation.y) * flySpeed * dt;
   cp.z += Math.cos(flyMesh.rotation.y) * flySpeed * dt;
+  const wasGround = cp.y <= 0.15;
   cp.y = Math.max(0, Math.min(150, cp.y + flyVy*dt));
+  if (wasGround && cp.y > 0.15) yaw = -flyMesh.rotation.y + Math.PI; // align camera on liftoff
   flyMesh.rotation.x = -flyPitch*0.7;
   flyMesh.rotation.z = THREE.MathUtils.clamp(steer*0.4, -0.5, 0.5);
   for (const c of colliders){
@@ -1371,7 +1374,7 @@ function flyTick(dt, f, r){
   }
   cur.position.set(cp.x, cp.y, cp.z);
   cur.rotation.y = flyMesh.rotation.y;
-  yaw = -flyMesh.rotation.y + Math.PI;
+  // free camera: user rotates manually (aligned on takeoff)
   carPrompt.textContent = onGround
     ? (flySpeed < 11 ? 'W = throttle (' + Math.round(flySpeed*3.6) + ' km/h)' : 'SPACE = take off! (' + Math.round(flySpeed*3.6) + ' km/h)')
     : Math.round(flySpeed*3.6) + ' km/h · Space/Shift climb · F exit';
