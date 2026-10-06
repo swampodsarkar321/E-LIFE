@@ -381,7 +381,7 @@ function buildAirport(){
 function placeLabel(text, y){ const c = document.createElement('canvas'); c.width = 512; c.height = 96; const x = c.getContext('2d'); x.fillStyle = '#000b'; x.beginPath(); if(x.roundRect) x.roundRect(4,8,504,80,22); else x.rect(4,8,504,80); x.fill();
   x.fillStyle = '#fff'; x.font = 'bold 42px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text.slice(0,24),256,50);
   const s = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthWrite:false})); s.scale.set(16,3,1); s.position.y = y; return s; }
-LM.forEach(l => { const g = new THREE.Group(); l.fn(g); g.position.set(l.x,0,l.z); scene.add(g); const s = placeLabel(l.name, l.h+3); g.add(s); l.label = s; colliders.push({x:l.x,z:l.z,r:l.r*.7}); });
+LM.forEach(l => { const g = new THREE.Group(); l.fn(g); g.position.set(l.x,0,l.z); scene.add(g); const s = placeLabel(l.name, l.h+3); g.add(s); l.label = s; colliders.push({x:l.x,z:l.z,r:l.r*.55}); });
 
 // ---------- roads & river ----------
 const ROADS = [
@@ -536,7 +536,7 @@ function spawnCityBuildings(){
       c.rotation.y = Math.floor(rnd()*4)*Math.PI/2;
       c.scale.multiplyScalar(v);
       scene.add(c);
-      colliders.push({x, z, r:Math.max(cr, tp.fp*v*0.55)});
+      colliders.push({x, z, r:Math.max(cr, tp.fp*v*0.55)*0.7});
       i++;
     }
   }
@@ -563,7 +563,7 @@ function spawnParkedCars(){
       c.rotation.y = Math.atan2(dx,dz) + (rnd() < 0.5 ? 0 : Math.PI);
       c.scale.multiplyScalar(v);
       scene.add(c);
-      const o2 = {x, z, r:cr}; o2.obj = c; c.userData.coll = o2; colliders.push(o2);
+      const o2 = {x, z, r:cr*0.85}; o2.obj = c; c.userData.coll = o2; colliders.push(o2);
       if (t.drive) driveables.push({g:c, chunk:'static', label:'CITY/'+encodeURIComponent(t.files[0])});
       i++;
     }
@@ -614,7 +614,7 @@ function makeChunk(ccx, ccz){
       const cr = Math.max((t.c||6)*v, tp.fp*v*0.55);
       if (!free(x,z,cr)) continue;
       if (colliders.some(cc => Math.hypot(cc.x-x,cc.z-z) < cc.r + tp.fp*v*0.62 + 1)) continue;
-      put(tp, x, z, v, Math.floor(rnd()*4)*Math.PI/2, cr);
+      put(tp, x, z, v, Math.floor(rnd()*4)*Math.PI/2, cr*0.7);
       i++;
     }
   }
@@ -1168,18 +1168,16 @@ function driveTick(dt, f, r){
   const myColl = driveCar.g.userData.coll;
   for (const c of colliders){
     if (c === myColl) continue;
-    const ox = cp.x - c.x, oz = cp.z - c.z, dd = Math.hypot(ox,oz), min = c.r + 1.4;
+    const ox = cp.x - c.x, oz = cp.z - c.z, dd = Math.hypot(ox,oz), min = c.r + 0.9;
     if (dd < min && dd > 0.01){ cp.x = c.x + ox/dd*min; cp.z = c.z + oz/dd*min; driveSpeed *= 0.4; }
   }
   if (myColl){ myColl.x = cp.x; myColl.z = cp.z; }
   cur.position.set(cp.x, 0, cp.z); // player rides along (visible driver)
   cur.rotation.y = driveCar.g.rotation.y;
-  // wheels spin + front steer
+  // wheels spin (capped so no strobe-freeze at speed)
   if (driveCar.wheels){
-    const spin = driveSpeed / 0.35 * dt;
+    const spin = Math.max(-12, Math.min(12, driveSpeed / 0.35)) * dt;
     for (const w of driveCar.wheels.spin) w.rotation.x += spin;
-    const sa = THREE.MathUtils.clamp(steer * 0.45, -0.5, 0.5);
-    for (const w of driveCar.wheels.steer) w.rotation.y = sa;
   }
   // free camera: user can rotate to look at the car
   carPrompt.textContent = 'F — get out (' + Math.abs(Math.round(driveSpeed*3.6)) + ' km/h)';
