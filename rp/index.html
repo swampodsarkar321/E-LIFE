@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>রংপুর - Roleplay Open World</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#9fd3f0;font-family:system-ui,"Noto Sans Bengali",sans-serif;color:#fff}
+  canvas{display:block}
+  .box{position:fixed;background:#000a;border-radius:12px;padding:10px 14px;font-size:14px;line-height:1.6}
+  #select{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding-bottom:6vh;background:linear-gradient(transparent 45%,#000a)}
+  #select h1{margin:0;font-size:clamp(22px,4vw,40px);text-shadow:0 2px 6px #0008}
+  #select p{margin:4px 0;opacity:.9}
+  #name{font-size:clamp(20px,3vw,28px);margin:4px 0 12px}
+  .row{display:flex;gap:12px}
+  button{font:inherit;font-weight:700;border:0;border-radius:12px;padding:12px 22px;background:#fff;color:#123;cursor:pointer}
+  button:hover{background:#ffe27a}
+  #start{background:#3ecf6b;color:#fff;font-size:20px;padding:14px 36px}
+  #hud{left:12px;top:12px;display:none;font-size:13px}
+  #quest{right:12px;top:12px;display:none;max-width:260px}
+  #quest b{color:#ffe27a}
+  #mini{position:fixed;right:12px;bottom:12px;width:170px;height:170px;border-radius:12px;border:2px solid #fff;display:none}
+  #place{position:fixed;left:50%;top:70px;transform:translateX(-50%);font-size:clamp(20px,3vw,32px);font-weight:700;text-shadow:0 2px 8px #000;opacity:0;transition:opacity .6s;pointer-events:none}
+  #dlg{left:50%;bottom:24px;transform:translateX(-50%);width:min(620px,92vw);display:none;font-size:17px}
+  #dlg i{display:block;font-size:12px;opacity:.7;margin-top:4px}
+  #prompt{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);display:none;background:#000a;padding:6px 14px;border-radius:20px}
+  #toast{position:fixed;left:50%;top:20%;transform:translateX(-50%);background:#3ecf6bdd;padding:10px 20px;border-radius:12px;font-weight:700;opacity:0;transition:opacity .5s;pointer-events:none;text-align:center}
+  #load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#123;font-size:22px;z-index:9}
+</style>
+</head>
+<body>
+<div id="load">রংপুর লোড হচ্ছে...</div>
+<div id="hud" class="box"><b>WASD</b> হাঁটা · <b>Shift</b> দৌড় · <b>মাউস ড্র্যাগ</b> ক্যামেরা · <b>E</b> কথা বলা/হাত নাড়া · <b>C</b> ক্যারেক্টার বদল<br>💰 <span id="money">0</span> টাকা</div>
+<div id="quest" class="box"></div>
+<canvas id="mini" width="340" height="340"></canvas>
+<div id="place"></div><div id="prompt">E চাপো — কথা বলো</div><div id="toast"></div>
+<div id="dlg" class="box"><b id="dn"></b><div id="dt"></div><i>E চাপো — পরের কথা</i></div>
+<div id="select">
+  <h1>রংপুরে স্বাগতম</h1><p>ট্রেনে রংপুর স্টেশনে নামছ — কে সাজবে?</p>
+  <div id="name"></div>
+  <div class="row"><button id="prev">◀</button><button id="start">রংপুরে নামো</button><button id="next">▶</button></div>
+</div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import * as SU from 'three/addons/utils/SkeletonUtils.js';
+const $ = id => document.getElementById(id);
+const CHARS = ['Adventurer','Astronaut','Beach Character','Business Man','Casual Character','Farmer','Hoodie Character','King','Punk','Swat','Worker'];
+let idx = 0, mode = 'select';
+const HALF = 260, SPAWN = [30,-92];
+
+// ---------- scene ----------
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true; document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xa8d8f2); scene.fog = new THREE.Fog(0xa8d8f2, 60, 260);
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, .1, 500);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x4a7a3a, 1.1));
+const sun = new THREE.DirectionalLight(0xfff2d0, 2.2); sun.castShadow = true; sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera,{left:-40,right:40,top:40,bottom:-40,near:1,far:140}); scene.add(sun, sun.target);
+
+const cv = document.createElement('canvas'); cv.width = cv.height = 256; const cx = cv.getContext('2d');
+cx.fillStyle = '#5f9f46'; cx.fillRect(0,0,256,256);
+for (let i=0;i<2500;i++){ cx.fillStyle = `hsl(${85+Math.random()*35},45%,${33+Math.random()*18}%)`; cx.fillRect(Math.random()*256,Math.random()*256,3,3); }
+const gt = new THREE.CanvasTexture(cv); gt.wrapS = gt.wrapT = THREE.RepeatWrapping; gt.repeat.set(HALF/2, HALF/2); gt.colorSpace = THREE.SRGBColorSpace;
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(HALF*2, HALF*2), new THREE.MeshLambertMaterial({map:gt}));
+ground.rotation.x = -Math.PI/2; ground.receiveShadow = true; scene.add(ground);
+
+// ---------- helpers ----------
+const MC = {}; const M = c => MC[c] ??= new THREE.MeshLambertMaterial({color:c});
+const sh = m => { m.castShadow = m.receiveShadow = true; return m; };
+const B = (p,w,h,d,c,x=0,y=0,z=0) => { const m = sh(new THREE.Mesh(new THREE.BoxGeometry(w,h,d), M(c))); m.position.set(x,y+h/2,z); p.add(m); return m; };
+const C = (p,rt,rb,h,c,x=0,y=0,z=0,s=14) => { const m = sh(new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,s), M(c))); m.position.set(x,y+h/2,z); p.add(m); return m; };
+const S = (p,r,c,x=0,y=0,z=0) => { const m = sh(new THREE.Mesh(new THREE.SphereGeometry(r,16,8,0,Math.PI*2,0,Math.PI/2), M(c))); m.position.set(x,y,z); p.add(m); return m; };
+const spinners = [];
+
+// ---------- landmark builders ----------
+const mosque = n => g => { B(g,6+n*5,6,10,0xf2f2ee); for(let i=0;i<n;i++) S(g,2.6,0x2e8b57,(i-(n-1)/2)*5,6,0); [-1,1].forEach(s=>{ C(g,.6,.8,13,0xffffff,s*(3+n*2.5),0,5,8); S(g,.9,0x2e8b57,s*(3+n*2.5),13,5); }); };
+const palace = g => { B(g,28,9,10,0xf6f1e4); B(g,6,12,6,0xf6f1e4,-17,0,0); B(g,6,12,6,0xf6f1e4,17,0,0); C(g,4,4.5,7,0xf6f1e4,0,9,0,8); S(g,4.5,0xe6dccb,0,16); C(g,.2,.2,3,0xb8860b,0,20.5,0,6);
+  for(let i=-5;i<=5;i++) C(g,.5,.5,7,0xffffff,i*2.4,0,5.3,8); B(g,12,.8,4,0xdddddd,0,0,7); B(g,34,.8,.8,0x2e7d32,0,0,14); B(g,.8,.8,12,0x2e7d32,-17,0,8); B(g,.8,.8,12,0x2e7d32,17,0,8); };
+const college = g => { B(g,36,8,10,0xb5452f); for(let i=-6;i<=6;i++) B(g,1.6,5,.4,0xfff4e0,i*2.8,0,5.1); [-1,1].forEach(s=>{ B(g,6,11,7,0xb5452f,s*21,0,0); S(g,3.2,0xfff4e0,s*21,11); }); S(g,4,0xfff4e0,0,8); };
+const townhall = g => { B(g,20,7,9,0xe9dcb8); const r = sh(new THREE.Mesh(new THREE.ConeGeometry(9,3.4,4), M(0xb04a3a))); r.position.y = 8.7; r.rotation.y = Math.PI/4; r.scale.z = .55; g.add(r); for(let i=0;i<6;i++) C(g,.5,.5,7,0xffffff,-7.5+i*3,0,5,8); B(g,22,.5,11,0xcccccc,0,7,0); };
+const station = g => { B(g,32,6,10,0xcfa27a); B(g,34,.6,14,0x7a3b2e,0,6,2); C(g,1.6,1.6,11,0xcfa27a,0,6,0,4); C(g,1.2,1.2,.4,0xffffff,0,15,3,12); B(g,90,.3,.5,0x444444,0,0,13); B(g,90,.3,.5,0x444444,0,0,14.6);
+  [0,1,2,3].forEach(i => B(g,8,3.4,3,i?0x2a6f3a:0xc0392b,-18+i*8.6,.6,13.8)); B(g,12,.5,5,0x888888,0,0,9); };
+const shapla = g => { C(g,12,12,.4,0xd8d8d0,0,0,0,32); C(g,2,2,.8,0x8a8a80,0,.4,0,16); for(let i=0;i<8;i++){ const p = new THREE.Group(); p.rotation.y = i*Math.PI/4; const c = sh(new THREE.Mesh(new THREE.ConeGeometry(1.1,4.6,6), M(0xf7a8c8))); c.position.set(2.2,3.6,0); c.rotation.z = -.55; p.add(c); g.add(p); } S(g,1.2,0xffd54a,0,3.2); };
+const jahaj = g => { B(g,12,2.2,3.6,0x7a4a2a,0,0,0); B(g,5,3,3,0xffffff,-1,2.2,0); C(g,.7,.7,3,0xc0392b,1.5,4,0,8); B(g,.3,9,.3,0x5a3a1a,3.5,2.2,0); B(g,.1,6,5,0xf4ecd8,3.5,3,1.5); };
+const modern = g => { B(g,10,16,10,0x6fa8c8); B(g,14,8,10,0x8fb8d8,12,0,0); B(g,8,11,8,0xd8d8d8,-12,0,0); B(g,10,1,.3,0xffd54a,0,10,5.2); };
+const satmatha = g => { C(g,9,9,.4,0xd8d8d0,0,0,0,28); for(let i=0;i<7;i++) C(g,.4,.4,5,[0xe53935,0x1e88e5,0xfdd835,0x43a047,0x8e24aa,0xfb8c00,0x00acc1][i],Math.cos(i*.898)*4.5,.4,Math.sin(i*.898)*4.5,8); };
+const school = g => { B(g,22,6,8,0xf2e3a0); B(g,24,.6,10,0x2e5da8,0,6,0); C(g,.15,.15,10,0xffffff,12,0,6,6); B(g,2.4,1.5,.1,0x1b8a3a,13.3,8.2,6); };
+const medical = g => { B(g,26,11,10,0xeeeeee); B(g,1.6,5,.4,0xd32f2f,0,4,5.1); B(g,5,1.6,.4,0xd32f2f,0,5.7,5.1); B(g,10,16,8,0xdddddd,-18,0,0); };
+const cantonment = g => { [[0,-24,50,0],[0,24,50,0],[-25,0,0,48],[25,0,0,48]].forEach(([x,z,w,d]) => B(g,w||.6,2.2,d||.6,0x556b2f,x,0,z)); [-12,0,12].forEach(x => B(g,10,3.5,5,0x8a9a6a,x,0,-10)); B(g,8,3.5,14,0x7a8a5a,-14,0,10); C(g,.15,.15,9,0xdddddd,8,0,12,6); B(g,3,1.8,.1,0x1b8a3a,9.5,6.8,12); };
+const stadium = g => { const w = sh(new THREE.Mesh(new THREE.CylinderGeometry(24,28,7,28,1,true), new THREE.MeshLambertMaterial({color:0xd9d4c4,side:THREE.DoubleSide}))); w.position.y = 3.5; g.add(w); C(g,20,20,.15,0x3f9a3f,0,0,0,28); [-1,1].forEach(s => C(g,.4,.4,16,0xcccccc,s*30,0,0,6)); };
+const zoo = g => { [[0,-16,34,0],[0,16,34,0],[-17,0,0,32],[17,0,0,32]].forEach(([x,z,w,d]) => B(g,w||.4,2,d||.4,0x8b5a2b,x,0,z)); [[-8,-6,0xb5651d],[6,-8,0x9e9e9e],[-6,7,0xe0a030],[8,6,0x6d4c41]].forEach(([x,z,c]) => { B(g,3.4,2,1.6,c,x,0,z); B(g,1.2,1.2,1.2,c,x+2.2,1.4,z); }); };
+const university = g => { B(g,30,8,9,0xe8e2d0); B(g,8,12,8,0xd9d0b8,-19,0,0); B(g,8,12,8,0xd9d0b8,19,0,0); S(g,4,0x8a2f2f,0,8); B(g,20,.6,3,0x3a7a3a,0,0,10); };
+const park = g => { C(g,13,13,.2,0x6bb04f,0,0,0,24); for(let i=0;i<5;i++){ const a = i*1.25; B(g,2.4,.5,.8,0x8b5a2b,Math.cos(a)*8,.5,Math.sin(a)*8); } C(g,.3,.3,3,0x6b4423,0,0,0,6); S(g,2.4,0x2f7d3a,0,3); };
+const vinno = g => { const w = new THREE.Group(); w.position.y = 15; const t = sh(new THREE.Mesh(new THREE.TorusGeometry(12,.4,8,32), M(0xf0f0f0))); w.add(t);
+  for(let i=0;i<8;i++){ const a = i*Math.PI/4; const sp = B(w,.2,24,.2,0xcccccc,0,-12,0); sp.rotation.z = a; sp.position.set(0,0,0); sp.geometry.translate(0,0,0); sp.rotation.z = a; B(w,2,2,2,[0xe53935,0x1e88e5,0xfdd835,0x43a047][i%4],Math.sin(a)*12-1,Math.cos(a)*12-1.6,0); }
+  g.add(w); spinners.push(w); B(g,1,15,1,0x888888,-3,0,0); B(g,1,15,1,0x888888,3,0,0); [-14,14].forEach(x => { const c = sh(new THREE.Mesh(new THREE.ConeGeometry(4,5,8), M(0xff7043))); c.position.set(x,2.5,10); g.add(c); }); };
+
+const LM = [
+ {id:'station',  name:'রংপুর রেলওয়ে স্টেশন', x:30,  z:-118, r:22, h:17, fn:station},
+ {id:'shapla',   name:'শাপলা চত্বর',          x:0,   z:-40,  r:13, h:9,  fn:shapla},
+ {id:'jahaj',    name:'জাহাজ কোম্পানি মোড়',  x:0,   z:2,    r:9,  h:9,  fn:jahaj},
+ {id:'townhall', name:'টাউন হল',              x:-42, z:-20,  r:13, h:13, fn:townhall},
+ {id:'jami',     name:'জামে মসজিদ',           x:-34, z:-64,  r:13, h:15, fn:mosque(3)},
+ {id:'satmatha', name:'সাতমাথা',              x:62,  z:-42,  r:10, h:8,  fn:satmatha},
+ {id:'taraganj', name:'তারাগঞ্জ মসজিদ',       x:96,  z:-62,  r:14, h:15, fn:mosque(4)},
+ {id:'modern',   name:'মডার্ন মোড়',          x:44,  z:42,   r:20, h:20, fn:modern},
+ {id:'school',   name:'রংপুর জিলা স্কুল',     x:-62, z:30,   r:14, h:11, fn:school},
+ {id:'medical',  name:'রংপুর মেডিকেল কলেজ',   x:84,  z:18,   r:22, h:17, fn:medical},
+ {id:'stadium',  name:'স্টেডিয়াম ও চিকলি ভাটা', x:118, z:78,  r:30, h:12, fn:stadium},
+ {id:'zoo',      name:'রংপুর চিড়িয়াখানা',    x:160, z:20,   r:22, h:8,  fn:zoo},
+ {id:'college',  name:'কারমাইকেল কলেজ',       x:-12, z:122,  r:22, h:15, fn:college},
+ {id:'tajhat',   name:'তাজহাট জমিদার বাড়ি',  x:22,  z:186,  r:24, h:24, fn:palace},
+ {id:'bru',      name:'বেগম রোকেয়া বিশ্ববিদ্যালয়', x:-78, z:190, r:24, h:15, fn:university},
+ {id:'cantt',    name:'রংপুর ক্যান্টনমেন্ট',   x:-92, z:-112, r:30, h:9,  fn:cantonment},
+ {id:'ghagat',   name:'ঘাঘট পার্ক',           x:-132,z:-60,  r:14, h:9,  fn:park},
+ {id:'vinno',    name:'ভিন্ন জগৎ',            x:185, z:170,  r:26, h:30, fn:vinno},
+];
+const colliders = [];
+function label(text, y){ const c = document.createElement('canvas'); c.width = 512; c.height = 96; const x = c.getContext('2d'); x.fillStyle = '#000b'; x.beginPath(); x.roundRect(4,8,504,80,22); x.fill();
+  x.fillStyle = '#fff'; x.font = 'bold 42px system-ui,"Noto Sans Bengali",sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text,256,50);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),transparent:true,depthWrite:false})); s.scale.set(16,3,1); s.position.y = y; return s; }
+LM.forEach(l => { const g = new THREE.Group(); l.fn(g); g.position.set(l.x,0,l.z); scene.add(g); const s = label(l.name, l.h+3); g.add(s); l.label = s; colliders.push({x:l.x,z:l.z,r:l.r*.55}); });
+
+// ---------- roads & river ----------
+const ROADS = [
+ [[30,-104],[0,-70],[0,-40],[0,0],[0,100],[22,160]],
+ [[-100,-20],[0,0],[44,42],[84,18],[118,60]],
+ [[-100,-100],[-34,-76],[0,-40],[62,-42],[130,-62]],
+ [[62,-42],[30,-100]],[[62,-42],[84,18]],[[62,-42],[130,0],[160,20]],
+ [[-62,30],[-62,100],[-12,122],[22,160]],[[22,160],[-78,190]],
+ [[44,42],[120,110],[185,160]],[[0,0],[-62,30]],[[-42,-20],[0,-40]],[[-132,-60],[-100,-100]],[[-100,-20],[-132,-60]]
+];
+const roadMat = M(0x3b3b3f);
+const SEG = []; ROADS.forEach(pl => { for(let i=0;i<pl.length-1;i++){ const [a,b] = [pl[i],pl[i+1]]; SEG.push([a,b]); const dx=b[0]-a[0], dz=b[1]-a[1], len=Math.hypot(dx,dz);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(7,len+3).rotateX(-Math.PI/2), roadMat); m.position.set((a[0]+b[0])/2,.03,(a[1]+b[1])/2); m.rotation.y = Math.atan2(dx,dz); m.receiveShadow = true; scene.add(m);
+  const dot = new THREE.Mesh(new THREE.PlaneGeometry(.3,len).rotateX(-Math.PI/2), M(0xe8e0a0)); dot.position.set(m.position.x,.05,m.position.z); dot.rotation.y = m.rotation.y; scene.add(dot); }});
+const RIVER = [[-262,-230],[-175,-150],[-150,-60],[-172,20],[-150,100],[-190,200],[-232,262]];
+const waterMat = new THREE.MeshLambertMaterial({color:0x2f8fd0});
+const RSEG = []; for(let i=0;i<RIVER.length-1;i++){ const [a,b] = [RIVER[i],RIVER[i+1]]; RSEG.push([a,b]); const dx=b[0]-a[0], dz=b[1]-a[1], len=Math.hypot(dx,dz);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(16,len+8).rotateX(-Math.PI/2), waterMat); m.position.set((a[0]+b[0])/2,.04,(a[1]+b[1])/2); m.rotation.y = Math.atan2(dx,dz); scene.add(m); }
+function dSeg(x,z,[a,b]){ const dx=b[0]-a[0], dz=b[1]-a[1]; let t = ((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz); t = Math.max(0,Math.min(1,t)); return Math.hypot(x-a[0]-t*dx, z-a[1]-t*dz); }
+const dRoad = (x,z) => Math.min(...SEG.map(s => dSeg(x,z,s)));
+const dRiver = (x,z) => Math.min(...RSEG.map(s => dSeg(x,z,s)));
+const nearLM = (x,z,pad) => LM.some(l => Math.hypot(l.x-x,l.z-z) < l.r+pad);
+
+// ---------- city blocks, trees ----------
+let seed = 11; const rnd = () => (seed = (seed*16807) % 2147483647) / 2147483647;
+const blds = [], pal = [0xe8d9b5,0xd9a37a,0xb5c9d9,0xe0b5b5,0xc9d9b5,0xf0e0c0,0xcfcfcf];
+for(let i=0;i<4000 && blds.length<190;i++){
+  const x=(rnd()-.5)*340, z=-140+rnd()*340, dr = dRoad(x,z);
+  if(dr<8 || dr>20 || dRiver(x,z)<16 || nearLM(x,z,8) || Math.abs(x)>HALF-20) continue;
+  const w=5+rnd()*5, d=5+rnd()*5, h=3+rnd()*(Math.hypot(x,z-30)<70?9:4);
+  if(colliders.some(c => Math.hypot(c.x-x,c.z-z) < c.r+Math.max(w,d)*.7+1)) continue;
+  blds.push({x,z,w,d,h,c:pal[Math.floor(rnd()*pal.length)]}); colliders.push({x,z,r:Math.max(w,d)*.55});
+}
+const bm = new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1).translate(0,.5,0), new THREE.MeshLambertMaterial(), blds.length);
+const mm = new THREE.Matrix4(), col = new THREE.Color();
+blds.forEach((b,i) => { bm.setMatrixAt(i, mm.compose(new THREE.Vector3(b.x,0,b.z), new THREE.Quaternion(), new THREE.Vector3(b.w,b.h,b.d))); bm.setColorAt(i, col.setHex(b.c)); });
+bm.castShadow = bm.receiveShadow = true; scene.add(bm);
+const T = []; for(let i=0;i<6000 && T.length<380;i++){ const x=(rnd()-.5)*HALF*1.95, z=(rnd()-.5)*HALF*1.95;
+  if(dRoad(x,z)<7 || dRiver(x,z)<12 || nearLM(x,z,4) || Math.hypot(x-SPAWN[0],z-SPAWN[1])<8 || colliders.some(c => Math.hypot(c.x-x,c.z-z) < c.r+2)) continue; T.push([x,z,.8+rnd()*.9]); colliders.push({x,z,r:.5}); }
+const tr = new THREE.InstancedMesh(new THREE.CylinderGeometry(.25,.35,2,6), M(0x6b4423), T.length), lf = new THREE.InstancedMesh(new THREE.ConeGeometry(1.6,4.5,7), M(0x2f7d3a), T.length);
+T.forEach(([x,z,s],i) => { tr.setMatrixAt(i, mm.makeScale(s,s,s).setPosition(x,s,z)); lf.setMatrixAt(i, mm.makeScale(s,s,s).setPosition(x,s*4,z)); });
+tr.castShadow = lf.castShadow = true; scene.add(tr, lf);
+
+// ---------- characters ----------
+const loader = new GLTFLoader(), cache = {};
+const loadChar = name => cache[name] ??= new Promise(res => loader.load('models/'+encodeURIComponent(name)+'.glb', g => {
+  const o = g.scene, h = (b => b.max.y-b.min.y)(new THREE.Box3().setFromObject(o,true)); o.scale.multiplyScalar(h>0 ? 1.8/h : 1);
+  const w = new THREE.Group(); w.add(o); o.position.y -= new THREE.Box3().setFromObject(w,true).min.y;
+  o.traverse(n => { if(n.isMesh){ n.castShadow = true; n.frustumCulled = false; } }); res({root:w, clips:g.animations}); }));
+const clipOf = (clips,n) => clips.find(c => c.name.endsWith('|'+n));
+let cur=null, mixer=null, actions={}, active=null, waveT=0;
+function play(n,f=.2){ const a = actions[n]; if(!a || active===a) return; a.reset().fadeIn(f).play(); if(active) active.fadeOut(f); active = a; }
+async function show(i){
+  const {root, clips} = await loadChar(CHARS[i]); if(i!==idx) return;
+  const p = cur ? cur.position.clone() : new THREE.Vector3(SPAWN[0],0,SPAWN[1]); if(cur) scene.remove(cur);
+  cur = root; cur.position.copy(p); scene.add(cur);
+  mixer = new THREE.AnimationMixer(cur); actions = {}; active = null; clips.forEach(c => actions[c.name.split('|').pop()] = mixer.clipAction(c));
+  play(mode==='select' ? 'Wave' : 'Idle', 0); $('name').textContent = CHARS[i];
+}
+const cycle = d => { idx = (idx+d+CHARS.length)%CHARS.length; show(idx); };
+$('prev').onclick = () => cycle(-1); $('next').onclick = () => cycle(1);
+
+// ---------- NPCs & quests ----------
+const NPC = [
+ {id:'chai', name:'কাদের চাচা (চা-ওয়ালা)', ch:'Farmer', at:[44,-104], quest:['আরে, নতুন মুখ! রংপুরে স্বাগতম। এক কাপ চা খাও, ভাড়া লাগবে না।','রংপুর ঘাঘট নদীর পাড়ের শহর, আর হারিভাঙ্গা আমের জন্য সারা দেশে নাম।','সোজা দক্ষিণে হাঁটো — শাপলা চত্বর। ওটাই শহরের প্রাণকেন্দ্র। যাও!'], idle:['শাপলা চত্বর দক্ষিণে। হাঁটতে থাকো!']},
+ {id:'dokan', name:'রফিক ভাই (দোকানদার)', ch:'Business Man', at:[8,10], quest:['জাহাজ কোম্পানি মোড়ে এলে দেখছি! এখান থেকে রংপুরের সব রাস্তা ছড়িয়েছে।','টাউন হল দেখেছ? ১৮৯২ সালের বাড়ি — পশ্চিমে, শাপলা চত্বরের কাছেই।'], idle:['মোড়ের চারপাশ ঘুরে দেখো, অনেক দোকান!']},
+ {id:'tourist', name:'ডেভিড (পর্যটক)', ch:'Adventurer', at:[-30,-6], quest:['এই টাউন হলের ইতিহাস ১৮৯২ সালের — এখানে এখনও অনুষ্ঠান হয়।','দক্ষিণে কারমাইকেল কলেজ যাও, ১৯১৬ সালের। ছাত্ররা ভালো গল্প জানে!'], idle:['শহরটা সত্যিই সুন্দর, তাই না?']},
+ {id:'student', name:'নাজমুল (ছাত্র)', ch:'Casual Character', at:[-4,136], quest:['কারমাইকেল কলেজ ১৯১৬ সালে চালু হয়, লালচে দালান আর খিলান দেখো।','আরেকটু দক্ষিণে তাজহাট জমিদার বাড়ি — রংপুরের সবচেয়ে বিখ্যাত স্থাপত্য!'], idle:['পরীক্ষার পড়া আছে, পরে কথা হবে!']},
+ {id:'guide', name:'আসিফ (জাদুঘর গাইড)', ch:'King', at:[36,174], quest:['তাজহাট রাজবাড়ি বিশ শতকের শুরুর দিকে বানানো, মাঝখানে বিশাল গম্বুজ।','এখন এটা জাদুঘর — ভেতরে পুরোনো পোড়ামাটির জিনিস আর পুঁথি আছে।','শেষ কাজ: দূরের "ভিন্ন জগৎ" পার্কে যাও, মজা করো!'], idle:['জাদুঘর ঘুরে দেখো, অনেক পুরোনো জিনিস আছে।']},
+ {id:'astro', name:'মহাকাশচারী মিঠু', ch:'Astronaut', at:[200,170], quest:['ভিন্ন জগতে স্বাগতম! এই নাগরদোলায় উঠলে রংপুর পুরোটা দেখা যায়।','তুমি পুরো রংপুর ঘুরে ফেলেছ — তুমি এখন শহরের আসল বাসিন্দা!'], idle:['নাগরদোলাটা দারুণ ঘোরে, তাই না?']},
+ {id:'guard', name:'সেন্ট্রি (সৈনিক)', ch:'Swat', at:[-60,-96], quest:[], idle:['ক্যান্টনমেন্ট এলাকা, বেশি কাছে যেও না।','ঘাঘট পার্ক পশ্চিমে নদীর ধারে — সেখানে বেড়াও।']},
+ {id:'ice', name:'সুমন (আইসক্রিম)', ch:'Beach Character', at:[-120,-50], quest:[], idle:['ঘাঘট নদীর হাওয়া খেতে খেতে আইসক্রিম খাও!']},
+ {id:'punk', name:'রাহাত (তরুণ)', ch:'Punk', at:[70,-30], quest:[], idle:['সাতমাথা মানে সাত রাস্তার মিলনস্থল — একবার গুনে দেখো!']},
+ {id:'rick', name:'জামাল (রিকশাচালক)', ch:'Hoodie Character', at:[8,-62], quest:[], idle:['রংপুরে রিকশা ছাড়া চলে? স্টেশন রোড ধরে সোজা যাও।']},
+ {id:'farm', name:'আলী (কৃষক)', ch:'Worker', at:[136,100], quest:[], idle:['মিঠাপুকুরের হারিভাঙ্গা আম বিখ্যাত, আর এই এলাকায় তামাক-ধানও হয়।']},
+];
+const QUESTS = [
+ {t:'স্টেশনের চা-ওয়ালা কাদের চাচার সাথে কথা বলো', ty:'talk', id:'chai', r:30},
+ {t:'শাপলা চত্বরে যাও', ty:'visit', id:'shapla', r:20},
+ {t:'জাহাজ কোম্পানি মোড়ের রফিক ভাইয়ের সাথে কথা বলো', ty:'talk', id:'dokan', r:30},
+ {t:'টাউন হলে গিয়ে ডেভিডের সাথে কথা বলো', ty:'talk', id:'tourist', r:40},
+ {t:'কারমাইকেল কলেজে নাজমুলের সাথে কথা বলো', ty:'talk', id:'student', r:50},
+ {t:'তাজহাট জমিদার বাড়ির গাইডের সাথে কথা বলো', ty:'talk', id:'guide', r:60},
+ {t:'ভিন্ন জগতে গিয়ে মিঠুর সাথে কথা বলো', ty:'talk', id:'astro', r:80},
+];
+let qi = 0, money = 0, talk = null;
+const objective = () => { const q = QUESTS[qi]; if(!q) return null; if(q.ty==='visit'){ const l = LM.find(l=>l.id===q.id); return [l.x,l.z]; } const n = NPC.find(n=>n.id===q.id); return n.at; };
+function panel(){ const q = QUESTS[qi]; const o = objective(); const d = o && cur ? Math.round(Math.hypot(o[0]-cur.position.x, o[1]-cur.position.z)) : 0;
+  $('quest').innerHTML = q ? `<b>কাজ ${qi+1}/${QUESTS.length}</b><br>${q.t}<br>📍 ${d} মি দূরে` : '<b>🎉 সব কাজ শেষ!</b><br>এখন যেখানে খুশি ঘোরো।'; $('money').textContent = money; }
+function toast(t){ const e = $('toast'); e.textContent = t; e.style.opacity = 1; setTimeout(() => e.style.opacity = 0, 2600); }
+function done(){ const r = 50 + qi*10; money += r; toast(`✔ কাজ শেষ! +${r} টাকা`); qi++; }
+NPC.forEach(async n => { const {root, clips} = await loadChar(n.ch); const o = SU.clone(root); o.position.set(n.at[0],0,n.at[1]); o.rotation.y = Math.PI*(.8+rnd()*.4); scene.add(o);
+  const mx = new THREE.AnimationMixer(o), c = clipOf(clips,'Idle'); if(c){ const a = mx.clipAction(c); a.time = rnd()*2; a.play(); } n.root = o; n.mixer = mx;
+  const s = label(n.name, 2.6); s.scale.set(6,1.1,1); o.add(s); n.sprite = s; colliders.push({x:n.at[0],z:n.at[1],r:.5}); });
+function nearestNPC(){ let b = null, bd = 3.6; NPC.forEach(n => { if(!n.root||!cur) return; const d = Math.hypot(n.at[0]-cur.position.x, n.at[1]-cur.position.z); if(d<bd){ bd = d; b = n; } }); return b; }
+function say(){ $('dn').textContent = talk.n.name; $('dt').textContent = talk.lines[talk.i]; $('dlg').style.display = 'block'; }
+function startTalk(n){ const q = QUESTS[qi], turn = !!q && q.ty==='talk' && q.id===n.id && n.quest.length; talk = {n, i:0, lines: turn ? n.quest : n.idle, turn};
+  const dx = cur.position.x-n.at[0], dz = cur.position.z-n.at[1]; n.root.rotation.y = Math.atan2(dx,dz); say(); }
+function nextLine(){ talk.i++; if(talk.i >= talk.lines.length){ const t = talk.turn; talk = null; $('dlg').style.display = 'none'; if(t) done(); panel(); } else say(); }
+
+// ---------- input & flow ----------
+const keys = {}; let yaw = 0, pitch = .35, dist = 6, drag = false;
+function begin(){ mode = 'play'; $('select').style.display = 'none'; ['hud','quest'].forEach(i => $(i).style.display = 'block'); $('mini').style.display = 'block'; play('Idle'); yaw = 0; panel(); toast('রংপুর স্টেশনে নামলে — চা-ওয়ালার সাথে কথা বলো (E)'); }
+$('start').onclick = begin;
+addEventListener('keydown', e => { keys[e.code] = true;
+  if(mode==='select'){ if(e.code==='ArrowLeft') cycle(-1); if(e.code==='ArrowRight') cycle(1); if(e.code==='Enter') begin(); return; }
+  if(e.code==='KeyE'){ if(talk) nextLine(); else { const n = nearestNPC(); if(n) startTalk(n); else waveT = 2; } }
+  if(e.code==='KeyC' && !talk){ mode = 'select'; $('select').style.display = 'flex'; ['hud','quest','mini'].forEach(i => $(i).style.display = 'none'); play('Wave'); } });
+addEventListener('keyup', e => keys[e.code] = false);
+renderer.domElement.addEventListener('pointerdown', () => drag = true); addEventListener('pointerup', () => drag = false);
+addEventListener('pointermove', e => { if(drag && mode==='play'){ yaw -= e.movementX*.005; pitch = Math.min(1.2, Math.max(.05, pitch+e.movementY*.005)); }});
+addEventListener('wheel', e => dist = Math.min(14, Math.max(3, dist+e.deltaY*.01)));
+addEventListener('resize', () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+
+// ---------- minimap ----------
+const mini = $('mini'), mc = mini.getContext('2d'), K = mini.width/(HALF*2), bg = document.createElement('canvas'); bg.width = bg.height = mini.width;
+{ const b = bg.getContext('2d'); b.fillStyle = '#5f9f46'; b.fillRect(0,0,bg.width,bg.height); const P = (x,z) => [(x+HALF)*K,(z+HALF)*K];
+  b.lineCap = 'round'; b.strokeStyle = '#2f8fd0'; b.lineWidth = 16*K; b.beginPath(); RIVER.forEach((p,i) => b[i?'lineTo':'moveTo'](...P(...p))); b.stroke();
+  b.strokeStyle = '#ddd'; b.lineWidth = 7*K+1; ROADS.forEach(pl => { b.beginPath(); pl.forEach((p,i) => b[i?'lineTo':'moveTo'](...P(...p))); b.stroke(); });
+  b.fillStyle = '#c44'; LM.forEach(l => { const [x,y] = P(l.x,l.z); b.beginPath(); b.arc(x,y,4,0,7); b.fill(); }); }
+function drawMini(){ mc.drawImage(bg,0,0); const P = (x,z) => [(x+HALF)*K,(z+HALF)*K]; const o = objective();
+  if(o){ const [x,y] = P(...o); mc.fillStyle = '#ffd400'; mc.beginPath(); mc.arc(x,y,7,0,7); mc.fill(); }
+  const [px,py] = P(cur.position.x, cur.position.z); mc.fillStyle = '#fff'; mc.strokeStyle = '#000'; mc.lineWidth = 2; mc.beginPath(); mc.arc(px,py,6,0,7); mc.fill(); mc.stroke(); }
+
+// ---------- loop ----------
+const clock = new THREE.Clock(), look = new THREE.Vector3(); let curPlace = '', pt = 0;
+function tick(){
+  const dt = Math.min(clock.getDelta(), .05);
+  spinners.forEach(s => s.rotation.z += dt*.25);
+  NPC.forEach(n => n.mixer && n.mixer.update(dt));
+  if(mode==='play' && !talk){
+    const f = (keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0), r = (keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);
+    if(f||r){ const run = keys.ShiftLeft||keys.ShiftRight, sp = run?9:3.8; const dx = -Math.sin(yaw)*f+Math.cos(yaw)*r, dz = -Math.cos(yaw)*f-Math.sin(yaw)*r, len = Math.hypot(dx,dz);
+      const ox = cur.position.x, oz = cur.position.z; cur.position.x += dx/len*sp*dt; cur.position.z += dz/len*sp*dt;
+      let d = Math.atan2(dx,dz)-cur.rotation.y; d = Math.atan2(Math.sin(d),Math.cos(d)); cur.rotation.y += d*Math.min(1,dt*12); waveT = 0; play(run?'Run':'Walk');
+      if(dRiver(cur.position.x,cur.position.z) < 7){ cur.position.x = ox; cur.position.z = oz; }
+    } else if(waveT>0){ waveT -= dt; play('Wave'); } else play('Idle');
+    for(const c of colliders){ const ox = cur.position.x-c.x, oz = cur.position.z-c.z, dd = Math.hypot(ox,oz), mn = c.r+.4; if(dd<mn && dd>0){ cur.position.x = c.x+ox/dd*mn; cur.position.z = c.z+oz/dd*mn; } }
+    cur.position.x = Math.max(-HALF+4, Math.min(HALF-4, cur.position.x)); cur.position.z = Math.max(-HALF+4, Math.min(HALF-4, cur.position.z));
+    const q = QUESTS[qi]; if(q && q.ty==='visit'){ const l = LM.find(l=>l.id===q.id); if(Math.hypot(l.x-cur.position.x,l.z-cur.position.z) < l.r*.9){ done(); } }
+    const n = nearestNPC(); $('prompt').style.display = n ? 'block' : 'none'; if(n) $('prompt').textContent = `E চাপো — ${n.name}`;
+    pt -= dt; if(pt<=0){ pt = .5; panel(); const here = LM.find(l => Math.hypot(l.x-cur.position.x,l.z-cur.position.z) < l.r*.8); if(here && here.id !== curPlace){ curPlace = here.id; const p = $('place'); p.textContent = '📍 '+here.name; p.style.opacity = 1; setTimeout(() => p.style.opacity = 0, 2400); } else if(!here) curPlace = ''; }
+    LM.forEach(l => l.label.visible = Math.hypot(l.x-cur.position.x,l.z-cur.position.z) < 110);
+  }
+  if(cur){
+    if(mode==='play'){ look.set(cur.position.x,1.5,cur.position.z); camera.position.set(look.x+Math.sin(yaw)*Math.cos(pitch)*dist, look.y+Math.sin(pitch)*dist, look.z+Math.cos(yaw)*Math.cos(pitch)*dist); drawMini(); }
+    else { cur.rotation.y += dt*.6; look.set(cur.position.x,1.1,cur.position.z); camera.position.set(look.x,1.5,look.z+4.4); }
+    camera.lookAt(look); sun.position.set(cur.position.x+35,55,cur.position.z+25); sun.target.position.copy(cur.position); mixer && mixer.update(dt);
+  }
+  renderer.render(scene,camera); requestAnimationFrame(tick);
+}
+camera.position.set(SPAWN[0],1.5,SPAWN[1]+4.4);
+show(0).then(() => { $('load').remove(); tick(); });
+</script>
+</body>
+</html>
