@@ -307,24 +307,24 @@ const vinno = g => { const w = new THREE.Group(); w.position.y = 15; const t = s
   g.add(w); spinners.push(w); B(g,1,15,1,0x888888,-3,0,0); B(g,1,15,1,0x888888,3,0,0); [-14,14].forEach(x => { const c = sh(new THREE.Mesh(new THREE.ConeGeometry(4,5,8), M(0xff7043))); c.position.set(x,2.5,10); g.add(c); }); };
 
 const LM = [
- {id:'station',  name:'Rangpur Railway Station', x:30,  z:-130, r:22, h:17, fn:station},
- {id:'shapla',   name:'Shapla Chattar',          x:0,   z:-40,  r:13, h:9,  fn:shapla},
- {id:'jahaj',    name:'Jahaj Company Crossing',  x:0,   z:2,    r:9,  h:9,  fn:jahaj},
- {id:'townhall', name:'Town Hall',               x:-42, z:-20,  r:13, h:13, fn:townhall},
- {id:'jami',     name:'Jame Mosque',             x:-48, z:-52,  r:13, h:15, fn:mosque(3)},
- {id:'satmatha', name:'Satmatha',                x:62,  z:-42,  r:10, h:8,  fn:satmatha},
- {id:'taraganj', name:'Taraganj Mosque',         x:96,  z:-78,  r:14, h:15, fn:mosque(4)},
- {id:'modern',   name:'Modern Crossing',         x:44,  z:62,   r:20, h:20, fn:modern},
- {id:'school',   name:'Rangpur Zilla School',    x:-62, z:30,   r:14, h:11, fn:school},
- {id:'medical',  name:'Rangpur Medical College', x:84,  z:18,   r:22, h:17, fn:medical},
- {id:'stadium',  name:'Stadium',                 x:135, z:95,   r:22, h:10, fn:stadium},
- {id:'zoo',      name:'Rangpur Zoo',             x:160, z:20,   r:22, h:8,  fn:zoo},
- {id:'college',  name:'Carmichael College',      x:-30, z:140,  r:22, h:15, fn:college},
- {id:'tajhat',   name:'Tajhat Palace',           x:22,  z:186,  r:24, h:24, fn:palace},
- {id:'bru',      name:'Begum Rokeya University', x:-78, z:190,  r:24, h:15, fn:university},
- {id:'cantt',    name:'Rangpur Cantonment',      x:-92, z:-112, r:30, h:9,  fn:cantonment},
- {id:'ghagat',   name:'Ghaghat Park',            x:-132,z:-60,  r:14, h:9,  fn:park},
- {id:'vinno',    name:'Vinno Jogot Park',        x:185, z:170,  r:26, h:30, fn:vinno},
+ {id:'station',  name:'Rangpur Railway Station', ic:'🚂', x:30,  z:-130, r:22, h:17, fn:station},
+ {id:'shapla',   name:'Shapla Chattar',          ic:'🌸', x:0,   z:-40,  r:13, h:9,  fn:shapla},
+ {id:'jahaj',    name:'Jahaj Company Crossing',  ic:'🚢', x:0,   z:2,    r:9,  h:9,  fn:jahaj},
+ {id:'townhall', name:'Town Hall',               ic:'🏛️', x:-42, z:-20,  r:13, h:13, fn:townhall},
+ {id:'jami',     name:'Jame Mosque',             ic:'🕌', x:-48, z:-52,  r:13, h:15, fn:mosque(3)},
+ {id:'satmatha', name:'Satmatha',                ic:'⭕', x:62,  z:-42,  r:10, h:8,  fn:satmatha},
+ {id:'taraganj', name:'Taraganj Mosque',         ic:'🕌', x:96,  z:-78,  r:14, h:15, fn:mosque(4)},
+ {id:'modern',   name:'Modern Crossing',         ic:'🏙️', x:44,  z:62,   r:20, h:20, fn:modern},
+ {id:'school',   name:'Rangpur Zilla School',    ic:'🎒', x:-62, z:30,   r:14, h:11, fn:school},
+ {id:'medical',  name:'Rangpur Medical College', ic:'🏥', x:84,  z:18,   r:22, h:17, fn:medical},
+ {id:'stadium',  name:'Stadium',                 ic:'🏟️', x:135, z:95,   r:22, h:10, fn:stadium},
+ {id:'zoo',      name:'Rangpur Zoo',             ic:'🦁', x:160, z:20,   r:22, h:8,  fn:zoo},
+ {id:'college',  name:'Carmichael College',      ic:'🎓', x:-30, z:140,  r:22, h:15, fn:college},
+ {id:'tajhat',   name:'Tajhat Palace',           ic:'🏰', x:22,  z:186,  r:24, h:24, fn:palace},
+ {id:'bru',      name:'Begum Rokeya University', ic:'🎓', x:-78, z:190,  r:24, h:15, fn:university},
+ {id:'cantt',    name:'Rangpur Cantonment',      ic:'🪖', x:-92, z:-112, r:30, h:9,  fn:cantonment},
+ {id:'ghagat',   name:'Ghaghat Park',            ic:'🌳', x:-132,z:-60,  r:14, h:9,  fn:park},
+ {id:'vinno',    name:'Vinno Jogot Park',        ic:'🎡', x:185, z:170,  r:26, h:30, fn:vinno},
 ];
 // spread landmarks far apart (1.8x)
 LM.forEach(l => { l.x *= 1.8; l.z *= 1.8; l.r *= 1.5; });
@@ -426,6 +426,9 @@ const miniBg = document.createElement('canvas'); miniBg.width = miniBg.height = 
   b.strokeStyle = '#2f8fd0'; b.lineWidth = 16*MK; b.beginPath(); RIVER.forEach((p,i) => b[i?'lineTo':'moveTo'](...P(...p))); b.stroke();
   b.strokeStyle = '#3b3b3f'; b.lineWidth = 7*MK+1; ROADS.forEach(pl => { b.beginPath(); pl.forEach((p,i) => b[i?'lineTo':'moveTo'](...P(...p))); b.stroke(); });
   b.fillStyle = '#c44'; LM.forEach(l => { const [x,y] = P(l.x,l.z); b.beginPath(); b.arc(x,y,4,0,7); b.fill(); });
+  b.font = '13px sans-serif'; b.textAlign = 'center'; b.textBaseline = 'middle';
+  LM.forEach(l => { const [x,y] = P(l.x,l.z); b.fillText(l.ic || '•', x, y); });
+  { const [ax,ay] = P(AIRPORT.x, AIRPORT.z); b.font = '15px sans-serif'; b.fillText('✈️', ax, ay); }
 }
 function drawMini(){
   mmc.drawImage(miniBg,0,0);
@@ -845,7 +848,7 @@ function sendTick(){
   const now = performance.now();
   if (now - lastSend < 120) return;
   lastSend = now;
-  set(ref(db, 'players/' + myId), {name:myName, char:CHARS[idx], x:+cur.position.x.toFixed(2), y:+cur.position.y.toFixed(2), z:+cur.position.z.toFixed(2), ry:+cur.rotation.y.toFixed(2), anim:myAnim(), vu:myUid, car:(driving && driveCar) ? driveCar.label : null, ts:Date.now()});
+  set(ref(db, 'players/' + myId), {name:myName, char:CHARS[idx], x:+cur.position.x.toFixed(2), y:+cur.position.y.toFixed(2), z:+cur.position.z.toFixed(2), ry:+cur.rotation.y.toFixed(2), anim:myAnim(), vu:myUid, car:(driving && driveCar) ? driveCar.label : null, sc:driving?0.8:1, ts:Date.now()});
 }
 function remotesTick(dt){
   for (const rm of remotes.values()){
@@ -854,6 +857,8 @@ function remotesTick(dt){
     rm.g.position.z += (rm.tz - rm.g.position.z)*Math.min(1, dt*10);
     rm.g.position.y += ((rm.ty || 0) - rm.g.position.y)*Math.min(1, dt*12);
     if (rm.carMesh){ rm.carMesh.position.x = rm.g.position.x; rm.carMesh.position.z = rm.g.position.z; rm.carMesh.rotation.y = rm.g.rotation.y; }
+    const rsc = (rm.d && rm.d.sc) || 1;
+    if (rm.g.scale.x !== rsc) rm.g.scale.set(rsc, rsc, rsc);
     let dd = (rm.try_ || 0) - rm.g.rotation.y;
     dd = Math.atan2(Math.sin(dd), Math.cos(dd));
     rm.g.rotation.y += dd*Math.min(1, dt*10);
@@ -1120,6 +1125,7 @@ function toggleCar(){
     colliders.push(o2);
     driveables.push(driveCar);
     driving = false; driveCar = null; driveSpeed = 0;
+    cur.scale.set(1, 1, 1);
     dist = 6;
     play('Idle');
     touchUI(true);
@@ -1144,6 +1150,7 @@ function toggleCar(){
     if (d.fly){ startFly(d); return; }
     driving = true; driveCar = d; driveSpeed = 0;
     cur.visible = true; // driver stays visible in car
+    cur.scale.set(0.8, 0.8, 0.8); // smaller so head fits
     yaw = -d.g.rotation.y + Math.PI; // start behind car, then free look
     dist = 9;
     play('Idle');
@@ -1172,7 +1179,7 @@ function driveTick(dt, f, r){
     if (dd < min && dd > 0.01){ cp.x = c.x + ox/dd*min; cp.z = c.z + oz/dd*min; driveSpeed *= 0.4; }
   }
   if (myColl){ myColl.x = cp.x; myColl.z = cp.z; }
-  cur.position.set(cp.x, 0, cp.z); // player rides along (visible driver)
+  cur.position.set(cp.x, -0.15, cp.z); // seated driver: head stays under roof
   cur.rotation.y = driveCar.g.rotation.y;
   // wheels spin (capped so no strobe-freeze at speed)
   if (driveCar.wheels){
