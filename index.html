@@ -275,7 +275,7 @@ const satmatha = g => { C(g,9,9,.4,0xd8d8d0,0,0,0,28); for(let i=0;i<7;i++) C(g,
 const school = g => { B(g,22,6,8,0xf2e3a0); B(g,24,.6,10,0x2e5da8,0,6,0); C(g,.15,.15,10,0xffffff,12,0,6,6); B(g,2.4,1.5,.1,0x1b8a3a,13.3,8.2,6); };
 const medical = g => { B(g,26,11,10,0xeeeeee); B(g,1.6,5,.4,0xd32f2f,0,4,5.1); B(g,5,1.6,.4,0xd32f2f,0,5.7,5.1); B(g,10,16,8,0xdddddd,-18,0,0); };
 const cantonment = g => { [[0,-24,50,0],[0,24,50,0],[-25,0,0,48],[25,0,0,48]].forEach(([x,z,w,d]) => B(g,w||.6,2.2,d||.6,0x556b2f,x,0,z)); [-12,0,12].forEach(x => B(g,10,3.5,5,0x8a9a6a,x,0,-10)); B(g,8,3.5,14,0x7a8a5a,-14,0,10); C(g,.15,.15,9,0xdddddd,8,0,12,6); B(g,3,1.8,.1,0x1b8a3a,9.5,6.8,12); };
-const stadium = g => { const w = sh(new THREE.Mesh(new THREE.CylinderGeometry(24,28,7,28,1,true), new THREE.MeshLambertMaterial({color:0xd9d4c4,side:THREE.DoubleSide}))); w.position.y = 3.5; g.add(w); C(g,20,20,.15,0x3f9a3f,0,0,0,28); [-1,1].forEach(s => C(g,.4,.4,16,0xcccccc,s*30,0,0,6)); };
+const stadium = g => { const w = sh(new THREE.Mesh(new THREE.CylinderGeometry(16,18,7,28,1,true), new THREE.MeshLambertMaterial({color:0xd9d4c4,side:THREE.DoubleSide}))); w.position.y = 3.5; g.add(w); C(g,13,13,.15,0x3f9a3f,0,0,0,28); [-1,1].forEach(s => C(g,.4,.4,16,0xcccccc,s*19,0,0,6)); };
 const zoo = g => { [[0,-16,34,0],[0,16,34,0],[-17,0,0,32],[17,0,0,32]].forEach(([x,z,w,d]) => B(g,w||.4,2,d||.4,0x8b5a2b,x,0,z)); [[-8,-6,0xb5651d],[6,-8,0x9e9e9e],[-6,7,0xe0a030],[8,6,0x6d4c41]].forEach(([x,z,c]) => { B(g,3.4,2,1.6,c,x,0,z); B(g,1.2,1.2,1.2,c,x+2.2,1.4,z); }); };
 const university = g => { B(g,30,8,9,0xe8e2d0); B(g,8,12,8,0xd9d0b8,-19,0,0); B(g,8,12,8,0xd9d0b8,19,0,0); S(g,4,0x8a2f2f,0,8); B(g,20,.6,3,0x3a7a3a,0,0,10); };
 const park = g => { C(g,13,13,.2,0x6bb04f,0,0,0,24); for(let i=0;i<5;i++){ const a = i*1.25; B(g,2.4,.5,.8,0x8b5a2b,Math.cos(a)*8,.5,Math.sin(a)*8); } C(g,.3,.3,3,0x6b4423,0,0,0,6); S(g,2.4,0x2f7d3a,0,3); };
@@ -284,19 +284,19 @@ const vinno = g => { const w = new THREE.Group(); w.position.y = 15; const t = s
   g.add(w); spinners.push(w); B(g,1,15,1,0x888888,-3,0,0); B(g,1,15,1,0x888888,3,0,0); [-14,14].forEach(x => { const c = sh(new THREE.Mesh(new THREE.ConeGeometry(4,5,8), M(0xff7043))); c.position.set(x,2.5,10); g.add(c); }); };
 
 const LM = [
- {id:'station',  name:'Rangpur Railway Station', x:30,  z:-118, r:22, h:17, fn:station},
+ {id:'station',  name:'Rangpur Railway Station', x:30,  z:-130, r:22, h:17, fn:station},
  {id:'shapla',   name:'Shapla Chattar',          x:0,   z:-40,  r:13, h:9,  fn:shapla},
  {id:'jahaj',    name:'Jahaj Company Crossing',  x:0,   z:2,    r:9,  h:9,  fn:jahaj},
  {id:'townhall', name:'Town Hall',               x:-42, z:-20,  r:13, h:13, fn:townhall},
- {id:'jami',     name:'Jame Mosque',             x:-34, z:-64,  r:13, h:15, fn:mosque(3)},
+ {id:'jami',     name:'Jame Mosque',             x:-48, z:-52,  r:13, h:15, fn:mosque(3)},
  {id:'satmatha', name:'Satmatha',                x:62,  z:-42,  r:10, h:8,  fn:satmatha},
- {id:'taraganj', name:'Taraganj Mosque',         x:96,  z:-62,  r:14, h:15, fn:mosque(4)},
- {id:'modern',   name:'Modern Crossing',         x:44,  z:42,   r:20, h:20, fn:modern},
+ {id:'taraganj', name:'Taraganj Mosque',         x:96,  z:-78,  r:14, h:15, fn:mosque(4)},
+ {id:'modern',   name:'Modern Crossing',         x:44,  z:62,   r:20, h:20, fn:modern},
  {id:'school',   name:'Rangpur Zilla School',    x:-62, z:30,   r:14, h:11, fn:school},
  {id:'medical',  name:'Rangpur Medical College', x:84,  z:18,   r:22, h:17, fn:medical},
- {id:'stadium',  name:'Stadium',                 x:118, z:78,   r:30, h:12, fn:stadium},
+ {id:'stadium',  name:'Stadium',                 x:135, z:95,   r:22, h:10, fn:stadium},
  {id:'zoo',      name:'Rangpur Zoo',             x:160, z:20,   r:22, h:8,  fn:zoo},
- {id:'college',  name:'Carmichael College',      x:-12, z:122,  r:22, h:15, fn:college},
+ {id:'college',  name:'Carmichael College',      x:-30, z:140,  r:22, h:15, fn:college},
  {id:'tajhat',   name:'Tajhat Palace',           x:22,  z:186,  r:24, h:24, fn:palace},
  {id:'bru',      name:'Begum Rokeya University', x:-78, z:190,  r:24, h:15, fn:university},
  {id:'cantt',    name:'Rangpur Cantonment',      x:-92, z:-112, r:30, h:9,  fn:cantonment},
@@ -311,11 +311,11 @@ LM.forEach(l => { const g = new THREE.Group(); l.fn(g); g.position.set(l.x,0,l.z
 // ---------- roads & river ----------
 const ROADS = [
  [[30,-104],[0,-70],[0,-40],[0,0],[0,100],[22,160]],
- [[-100,-20],[0,0],[44,42],[84,18],[118,60]],
- [[-100,-100],[-34,-76],[0,-40],[62,-42],[130,-62]],
- [[62,-42],[30,-100]],[[62,-42],[84,18]],[[62,-42],[130,0],[160,20]],
- [[-62,30],[-62,100],[-12,122],[22,160]],[[22,160],[-78,190]],
- [[44,42],[120,110],[185,160]],[[0,0],[-62,30]],[[-42,-20],[0,-40]],[[-132,-60],[-100,-100]],[[-100,-20],[-132,-60]]
+ [[-100,-20],[0,0],[44,42],[68,4]],
+ [[-60,-100],[-34,-76],[0,-40],[62,-42],[130,-62]],
+ [[62,-42],[30,-100]],[[62,-42],[68,4]],[[62,-42],[130,0],[141,9]],
+ [[-62,30],[-62,100],[-12,122],[22,160]],[[22,160],[-58,180]],
+ [[44,42],[120,110],[172,148]],[[0,0],[-46,23]],[[-30,-30],[0,-40]],[[-132,-60],[-60,-100]],[[-100,-20],[-132,-60]]
 ];
 const roadMat2 = M(0x3b3b3f);
 const SEG = []; ROADS.forEach(pl => { for(let i=0;i<pl.length-1;i++){ const [a,b] = [pl[i],pl[i+1]]; SEG.push([a,b]); const dx=b[0]-a[0], dz=b[1]-a[1], len=Math.hypot(dx,dz);
@@ -400,7 +400,8 @@ function prepTreeModel(g, targetH, byWidth){
   const size = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3());
   const s0 = byWidth ? 1.9 / Math.max(size.x, size.z, 0.01) : targetH / (size.y || 1);
   o.scale.multiplyScalar(s0); o.updateMatrixWorld(true);
-  return {o, minY:new THREE.Box3().setFromObject(o).min.y};
+  const box2 = new THREE.Box3().setFromObject(o);
+  return {o, minY:box2.min.y, fp:Math.max(box2.max.x-box2.min.x, box2.max.z-box2.min.z)};
 }
 const tplCars = [];
 const tplBldg = [];
@@ -430,19 +431,20 @@ function spawnCityBuildings(){
     if (!models.length) continue;
     for (let i = 0, tries = 0; i < t.n && tries < t.n*25; tries++){
       const x = (rnd()-.5)*340, z = -140 + rnd()*340;
-      const dr = dRoad(x,z);
-      const w = 8 + rnd()*6, need = 5 + w*0.6;
-      if (dr < need || dr > 26 || dRiver(x,z) < 16 || nearLM(x,z,8) || Math.abs(x) > HALF-20) continue;
-      const v = 0.9 + rnd()*0.4, cr = (t.c || 6)*v;
-      if (!free(x,z,cr)) continue;
-      if (colliders.some(c => Math.hypot(c.x-x,c.z-z) < c.r + w*0.6 + 1)) continue;
+      const v = 0.9 + rnd()*0.4;
       const tp = models[Math.floor(rnd()*models.length)];
+      const need = 5 + (tp.fp*v)*0.62;
+      const dr = dRoad(x,z);
+      if (dr < need || dr > 26 || dRiver(x,z) < 16 || nearLM(x,z,8) || Math.abs(x) > HALF-20) continue;
+      const cr = (t.c || 6)*v;
+      if (!free(x,z,cr)) continue;
+      if (colliders.some(cc => Math.hypot(cc.x-x,cc.z-z) < cc.r + tp.fp*v*0.62 + 1)) continue;
       const c = tp.o.clone();
       c.position.set(x, -tp.minY*v, z);
       c.rotation.y = Math.floor(rnd()*4)*Math.PI/2;
       c.scale.multiplyScalar(v);
       scene.add(c);
-      colliders.push({x, z, r:cr});
+      colliders.push({x, z, r:Math.max(cr, tp.fp*v*0.55)});
       i++;
     }
   }
@@ -466,7 +468,7 @@ function spawnParkedCars(){
       const tp = models[Math.floor(rnd()*models.length)];
       const c = tp.o.clone();
       c.position.set(x, -tp.minY*v, z);
-      c.rotation.y = Math.atan2(dx,dz) + (side > 0 ? Math.PI/2 : -Math.PI/2);
+      c.rotation.y = Math.atan2(dx,dz) + (rnd() < 0.5 ? 0 : Math.PI);
       c.scale.multiplyScalar(v);
       scene.add(c);
       const o2 = {x, z, r:cr}; o2.obj = c; c.userData.coll = o2; colliders.push(o2);
