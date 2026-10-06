@@ -378,7 +378,7 @@ function buildAirport(){
       scene.add(c);
       const o2 = {x:AIRPORT.x + dx, z:AIRPORT.z + dz, r:3.2};
       o2.obj = c; c.userData.coll = o2; colliders.push(o2);
-      driveables.push({g:c, chunk:'static', label:encodeURIComponent('Jet by Poly by Google - bgUY8zN2Bq9.glb'), fly:true});
+      driveables.push({g:c, chunk:'static', label:encodeURIComponent('Jet by Poly by Google - bgUY8zN2Bq9.glb'), fly:true, size:9});
     });
   }
 }
@@ -683,7 +683,7 @@ function spawnParkedCars(){
       c.scale.multiplyScalar(v);
       scene.add(c);
       const o2 = {x, z, r:cr*0.85}; o2.obj = c; c.userData.coll = o2; colliders.push(o2);
-      if (t.drive) driveables.push({g:c, chunk:'static', label:'CITY/'+encodeURIComponent(t.files[0])});
+      if (t.drive) driveables.push({g:c, chunk:'static', label:'CITY/'+encodeURIComponent(t.files[0]), size:cr+1.5});
       i++;
     }
   }
@@ -752,7 +752,7 @@ function makeChunk(ccx, ccz){
       if (!free(x,z,cr)) continue;
       const tp = models[Math.floor(rnd()*models.length)];
       const cc = put(tp, x, z, v, alongX ? (lane > 0 ? Math.PI/2 : -Math.PI/2) : (lane > 0 ? 0 : Math.PI), cr);
-      if (t.drive) driveables.push({g:cc, chunk:key, label:t.files[0]});
+      if (t.drive) driveables.push({g:cc, chunk:key, label:'CITY/'+encodeURIComponent(t.files[0]), size:cr+1.5});
       i++;
     }
   }
@@ -1221,10 +1221,11 @@ let driving = false, driveCar = null, driveSpeed = 0;
 const carPrompt = document.getElementById('carPrompt');
 function nearestCar(){
   if (!cur) return null;
-  let best = null, bd = 3.5;
+  let best = null, bd = 1e9;
   for (const d of driveables){
     const dd = Math.hypot(cur.position.x - d.g.position.x, cur.position.z - d.g.position.z);
-    if (dd < bd){ bd = dd; best = d; }
+    const reach = 3.5 + (d.size || 0);
+    if (dd < reach && dd < bd){ bd = dd; best = d; }
   }
   return best;
 }
