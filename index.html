@@ -337,7 +337,7 @@ SPAWN.x *= 1.8; SPAWN.z *= 1.8;
 LM.push({id:'beach', name:"Cox's Bazar Sea Beach", x:1500, z:-1700, r:45, h:8, fn:beach});
 const BEACH = {x:1500, z:-1700};
 // ---------- airport ----------
-const AIRPORT = {x:420, z:-480};
+const AIRPORT = {x:360, z:-360};
 let jetTpl = null;
 async function loadJet(){
   try {
@@ -415,6 +415,7 @@ const nearLM = (x,z,pad) => LM.some(l => Math.hypot(l.x-x,l.z-z) < l.r+pad);
 const mm = new THREE.Matrix4();
 const T = []; for(let i=0;i<6000 && T.length<380;i++){ const x=(rnd()-.5)*HALF*1.95, z=(rnd()-.5)*HALF*1.95;
   if (Math.abs(x-AIRPORT.x) < 140 && Math.abs(z-AIRPORT.z) < 60) continue;
+  if (Math.abs(x-AIRPORT.x) < 140 && Math.abs(z-AIRPORT.z) < 60) continue;
   if(dRoad(x,z)<7 || dRiver(x,z)<12 || nearLM(x,z,4) || Math.hypot(x-SPAWN.x,z-SPAWN.z)<8 || colliders.some(c => Math.hypot(c.x-x,c.z-z) < c.r+2)) continue; T.push([x,z,.8+rnd()*.9]); colliders.push({x,z,r:.5}); }
 const tr = new THREE.InstancedMesh(new THREE.CylinderGeometry(.25,.35,2,6), M(0x6b4423), T.length), lf = new THREE.InstancedMesh(new THREE.ConeGeometry(1.6,4.5,7), M(0x2f7d3a), T.length);
 T.forEach(([x,z,s],i) => { tr.setMatrixAt(i, mm.makeScale(s,s,s).setPosition(x,s,z)); lf.setMatrixAt(i, mm.makeScale(s,s,s).setPosition(x,s*4,z)); });
@@ -432,6 +433,7 @@ const miniBg = document.createElement('canvas'); miniBg.width = miniBg.height = 
   b.strokeStyle = '#2f8fd0'; b.lineWidth = 16*MK; b.beginPath(); RIVER.forEach((p,i) => b[i?'lineTo':'moveTo'](...P(...p))); b.stroke();
   b.strokeStyle = '#3b3b3f'; b.lineWidth = 7*MK+1; ROADS.forEach(pl => { b.beginPath(); pl.forEach((p,i) => b[i?'lineTo':'moveTo'](...P(...p))); b.stroke(); });
   b.fillStyle = '#c44'; LM.forEach(l => { const [x,y] = P(l.x,l.z); b.beginPath(); b.arc(x,y,4,0,7); b.fill(); });
+  { const [ax,ay] = P(AIRPORT.x, AIRPORT.z); b.font = '18px sans-serif'; b.textAlign = 'center'; b.textBaseline = 'middle'; b.fillText('✈️', ax, ay); }
   b.font = '13px sans-serif'; b.textAlign = 'center'; b.textBaseline = 'middle';
   LM.forEach(l => { const [x,y] = P(l.x,l.z); b.fillText(l.ic || '•', x, y); });
   { const [ax,ay] = P(AIRPORT.x, AIRPORT.z); b.font = '15px sans-serif'; b.fillText('✈️', ax, ay); }
@@ -521,6 +523,7 @@ function drawBig(){
   bigx.drawImage(miniBg, 0, 0, W, W);
   bigx.font = '20px sans-serif'; bigx.textAlign = 'center'; bigx.textBaseline = 'middle';
   LM.forEach(l => { const [x,y] = P(l.x, l.z); bigx.fillText(l.ic || '•', x, y); });
+  { const [ax,ay] = P(AIRPORT.x, AIRPORT.z); bigx.font = '24px sans-serif'; bigx.fillText('✈️', ax, ay); }
   if (mark && cur){
     const route = roadRoute(cur.position.x, cur.position.z, mark.x, mark.z);
     bigx.strokeStyle = '#ffd21f'; bigx.lineWidth = 5; bigx.setLineDash([12, 8]);
