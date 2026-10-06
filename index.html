@@ -345,7 +345,7 @@ async function loadJet(){
     const o = g.scene;
     o.updateMatrixWorld(true);
     const size = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3());
-    o.scale.multiplyScalar(12 / Math.max(size.x, size.y, size.z, 0.01));
+    o.scale.multiplyScalar(18 / Math.max(size.x, size.y, size.z, 0.01));
     o.updateMatrixWorld(true);
     jetTpl = {o, minY:new THREE.Box3().setFromObject(o).min.y};
   } catch(e){ console.error('jet failed', e); }
@@ -369,12 +369,12 @@ function buildAirport(){
     const s = placeLabel('Rangpur Airport', 26);
     s.position.set(AIRPORT.x - 20, 0, AIRPORT.z + 28); scene.add(s);
   }
-  // 2 parked flyable jets
+  // 2 parked flyable jets, aligned with runway (+X)
   if (jetTpl){
-    [[-30, 12, 0.2],[ -38, -10, -0.15]].forEach(([dx, dz, ry]) => {
+    [[-30, 12],[ -38, -10]].forEach(([dx, dz]) => {
       const c = jetTpl.o.clone();
       c.position.set(AIRPORT.x + dx, -jetTpl.minY, AIRPORT.z + dz);
-      c.rotation.y = ry;
+      c.rotation.y = Math.PI/2;
       scene.add(c);
       const o2 = {x:AIRPORT.x + dx, z:AIRPORT.z + dz, r:3.2};
       o2.obj = c; c.userData.coll = o2; colliders.push(o2);
@@ -1346,11 +1346,12 @@ function flyTick(dt, f, r){
   const steer = r + (carIn.r - carIn.l);
   flyMesh.rotation.y -= steer * 1.1 * dt * Math.min(1, Math.abs(flySpeed)/15 + 0.2);
   const onGround = cp.y <= 0.15;
-  if (onGround && flySpeed < 14){
+  if (onGround && flySpeed < 11){
     flyPitch = 0; // need takeoff speed
   } else {
     if (upIn) flyPitch = Math.min(0.55, flyPitch + 0.9*dt);
     else if (dnIn) flyPitch = Math.max(-0.5, flyPitch - 0.9*dt);
+    else if (onGround && flySpeed > 16 && flyThrottle > 0.8) flyPitch = Math.min(0.14, flyPitch + 0.5*dt); // auto-rotate
     else flyPitch *= (1 - Math.min(1, dt*0.8));
   }
   if (!onGround && flySpeed < 10) flyPitch = Math.min(flyPitch, -0.25); // stall
@@ -1370,7 +1371,9 @@ function flyTick(dt, f, r){
   cur.position.set(cp.x, cp.y, cp.z);
   cur.rotation.y = flyMesh.rotation.y;
   yaw = -flyMesh.rotation.y + Math.PI;
-  carPrompt.textContent = Math.round(flySpeed*3.6) + ' km/h · F exit';
+  carPrompt.textContent = onGround
+    ? (flySpeed < 11 ? 'W = throttle (' + Math.round(flySpeed*3.6) + ' km/h)' : 'SPACE = take off! (' + Math.round(flySpeed*3.6) + ' km/h)')
+    : Math.round(flySpeed*3.6) + ' km/h · Space/Shift climb · F exit';
   carPrompt.style.display = 'block';
 }
 
